@@ -2,7 +2,9 @@ from llama_cpp_python_streamingllm import StreamingLLM
 import gradio as gr
 import time
 import re
+from chat_template import ChatTemplate
 
+#  ========== 让聊天界面的文本框等高 ==========
 custom_css = r'''
 #RAG-area > label {
     height: 100%;
@@ -15,6 +17,7 @@ custom_css = r'''
 '''
 
 
+#  ========== 适配 SillyTavern 的模版 ==========
 def text_format(text: str, _env=None, **env):
     if _env is not None:
         for k, v in _env.items():
@@ -24,26 +27,15 @@ def text_format(text: str, _env=None, **env):
     return text
 
 
+#  ========== 给引号加粗 ==========
 reg_q = re.compile(r'“(.+?)”')
-im_start = r'<|im_start|>'
-im_end = r'<|im_end|>'
-nl = '\n'
-im_end_nl = [7, 144]
-eos = (2, 7)
 
 
 def chat_display_format(text: str):
-    return reg_q.sub(' **\g<0>** ', text)
+    return reg_q.sub(r' **\g<0>** ', text)
 
 
-def chat_template(_role, tokens):
-    return model.tokenize((im_start + _role + nl + tokens + im_end + nl).encode('utf-8'), add_bos=False, special=True)
-
-
-def chat_role(_role):
-    return model.tokenize((im_start + _role + nl).encode('utf-8'), add_bos=False, special=True)
-
-
+#  ========== 温度、采样之类的设置 ==========
 with gr.Blocks() as setting:
     with gr.Row():
         setting_path = gr.Textbox(value=r"D:\models\01yi-6b-Q4_K_M.gguf", label="模型路径", scale=2)
@@ -53,17 +45,7 @@ with gr.Blocks() as setting:
         setting_ctx = gr.Number(value=0, label="上下文大小（Tokens）")
         setting_max_tokens = gr.Number(value=1024, label="最大响应长度（Tokens）", interactive=True, minimum=1,
                                        maximum=4095)
-    print(setting_path.value, setting_seed.value, setting_n_gpu_layers.value, setting_ctx.value)
-    model = StreamingLLM(model_path=setting_path.value,
-                         seed=setting_seed.value,
-                         n_gpu_layers=setting_n_gpu_layers.value,
-                         n_ctx=setting_ctx.value)
-    setting_ctx.value = model.context_params.n_ctx
-    # system_prompt = gr.Textbox(value="You are helpful AI.", lines=1, label="System Prompt")
-    # tmp = chat_template(model.str_tokenize(system_prompt.value))
-    # system_prompt_tokens = gr.Textbox(value=str(tmp), lines=1, label="System Prompt Tokens")
     with gr.Row():
-        # setting_n_keep = gr.Number(value=model.eval_t(tmp), label="n_keep", interactive=False)
         setting_n_keep = gr.Number(value=10, label="n_keep", interactive=False)
         setting_n_discard = gr.Number(value=256, label="n_discard", interactive=True, minimum=1, maximum=4095)
     with gr.Row():
@@ -86,6 +68,14 @@ with gr.Blocks() as setting:
         setting_mirostat_eta = gr.Number(value=0.1, label="Mirostat 学习率", interactive=True, step=0.1)
         setting_mirostat_tau = gr.Number(value=5.0, label="Mirostat 目标熵", interactive=True, step=0.1)
 
+    #  ========== 加载模型 ==========
+    model = StreamingLLM(model_path=setting_path.value,
+                         seed=setting_seed.value,
+                         n_gpu_layers=setting_n_gpu_layers.value,
+                         n_ctx=setting_ctx.value)
+    setting_ctx.value = model.context_params.n_ctx
+
+# ========== 定义角色卡 ==========
 # @东东恋爱脑 & @PickleKetchup
 role_char_d = r'''
 故事发生在中国古代。{{char}}是一个有才华、性格高傲的小姑娘，年仅17岁的{{char}}已经在古典文学上颇有造诣，常常可以写出富有诗意的词章。{{char}}的哥哥{{user}}则是一个笨拙好色的书生，{{user}}总是去青楼找风尘女子寻欢作乐，却因为自己笨拙而经常在女人面前出丑。
@@ -126,34 +116,45 @@ role_char_first = r'''
 “淫臀每日染繁霜，春去秋来菊蕊黄。这种污秽的词语，像你这种下贱无知的公狗能读懂吗?意思就是女孩雪白柔软的翘臀，‘染繁霜’比喻男性阳精的浇灌，每日云雨使臀上仿佛沾染了晶莹的霜花。‘春去秋来菊蕊黄’则将女性私密之处比作娇嫩的菊花，经过频繁的云雨之后，菊蕊外露，颜色由白转黄，明白了吗？”
 '''.strip()
 
+# ========== 聊天的模版 默认 chatml ==========
+eos = (2, 7)  # [eos, im_end]
+chat_template = ChatTemplate(model)
+
+# ========== 展示角色卡 ==========
 with gr.Blocks() as role:
     with gr.Row():
-        role_usr = gr.Textbox(value=r"哥哥", label="用户名称", interactive=True)
-        role_char = gr.Textbox(value=r"小昭", label="角色名称", interactive=True)
+        role_usr = gr.Textbox(value=r"无忌", label="用户名称")
+        role_char = gr.Textbox(value=r"小昭", label="角色名称")
 
-    role_char_d = gr.Textbox(value=role_char_d, lines=2, max_lines=99, label="角色描述", interactive=True)
+    role_char_d = gr.Textbox(value=role_char_d, lines=10, max_lines=99, label="角色描述")
+    role_chat_style = gr.Textbox(value=role_chat_style, lines=10, max_lines=99, label="回复示例")
+    role_char_first = gr.Textbox(value=role_char_first, lines=10, max_lines=99, label="第一条消息")
+
+    # ========== 加载角色卡-角色描述 ==========
+    # 这个暖机的 bos [1] 删了就不正常了
     tmp = [1] + chat_template('system',
                               text_format(role_char_d.value,
                                           char=role_char.value,
                                           user=role_usr.value))
-    setting_n_keep.value = model.eval_t(tmp)
+    setting_n_keep.value = model.eval_t(tmp)  # 此内容永久存在
 
-    role_chat_style = gr.Textbox(value=role_chat_style, lines=2, max_lines=99, label="回复示例", interactive=True)
+    # ========== 加载角色卡-回复示例 ==========
     tmp = chat_template(role_char.value,
                         text_format(role_chat_style.value,
                                     char=role_char.value,
                                     user=role_usr.value))
-    setting_n_keep.value = model.eval_t(tmp)
+    setting_n_keep.value = model.eval_t(tmp)  # 此内容永久存在
 
-    role_char_first = gr.Textbox(value=role_char_first, lines=2, max_lines=99, label="第一条消息", interactive=True)
+    # ========== 加载角色卡-第一条消息 ==========
     tmp = text_format(role_char_first.value,
                       char=role_char.value,
                       user=role_usr.value)
     chatbot = [(None, chat_display_format(tmp))]
     tmp = chat_template(role_char.value, tmp)
-    print("第一条消息", model.eval_t(tmp))
+    model.eval_t(tmp)  # 此内容随上下文增加将被丢弃
 
 
+# ========== 显示用户消息 ==========
 def btn_submit_usr(message, history):
     # print('btn_submit_usr', message, history)
     if history is None:
@@ -161,6 +162,7 @@ def btn_submit_usr(message, history):
     return "", history + [[message, '']]
 
 
+# ========== 模型流式响应 ==========
 def btn_submit_bot(history, _n_keep, _n_discard,
                    _temperature, _repeat_penalty, _frequency_penalty,
                    _presence_penalty, _repeat_last_n, _top_k,
@@ -168,13 +170,13 @@ def btn_submit_bot(history, _n_keep, _n_discard,
                    _tfs_z, _mirostat_mode, _mirostat_eta,
                    _mirostat_tau, _usr, _char,
                    _rag, _max_tokens):
-    if len(_rag) > 0:
+    if len(_rag) > 0:  # 需要临时注入的内容
         t_rag = chat_template('system', _rag)
         model.eval_t(t_rag, _n_keep, _n_discard)
     t_msg = history[-1][0]
     t_msg = chat_template(_usr, t_msg)
     model.eval_t(t_msg, _n_keep, _n_discard)
-    t_bot = chat_role(_char)
+    t_bot = chat_template(_char)
     completion_tokens = []
     token = None
     for token in model.generate_t(
@@ -210,9 +212,9 @@ def btn_submit_bot(history, _n_keep, _n_discard,
             break
     history[-1][1] = chat_display_format(history[-1][1])
     yield history, model.n_tokens
-    model.eval_t(im_end_nl, _n_keep, _n_discard)
-    t_bot.extend(im_end_nl)
-    if len(_rag) > 0:
+    model.eval_t(chat_template.im_end_nl, _n_keep, _n_discard)
+    t_bot.extend(chat_template.im_end_nl)
+    if len(_rag) > 0:  # 响应完毕后清除注入的内容
         # history t_rag t_msg t_bot -> history t_msg t_bot
         n_discard = len(t_rag)
         n_keep = model.n_tokens - len(t_bot) - len(t_msg) - len(t_rag)
@@ -220,6 +222,7 @@ def btn_submit_bot(history, _n_keep, _n_discard,
     yield history, model.n_tokens
 
 
+# ========== 聊天页面 ==========
 with gr.Blocks() as chatting:
     with gr.Row(equal_height=True):
         chatbot = gr.Chatbot(height='60vh', scale=2, value=chatbot,
@@ -253,9 +256,10 @@ with gr.Blocks() as chatting:
     )
     btn_com1.click(fn=lambda: model.str_detokenize(model._input_ids), outputs=rag)
 
+
+# ========== 开始运行 ==========
 demo = gr.TabbedInterface([chatting, setting, role],
                           ["聊天", "设置", '角色'],
                           css=custom_css)
-
 gr.close_all()
 demo.queue().launch(share=False)
