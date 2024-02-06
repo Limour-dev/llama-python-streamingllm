@@ -1,8 +1,9 @@
 from llama_cpp_python_streamingllm import StreamingLLM
 import gradio as gr
-import time
+import time, os
 import re
 from chat_template import ChatTemplate
+import pickle
 
 #  ========== 让聊天界面的文本框等高 ==========
 custom_css = r'''
@@ -39,6 +40,7 @@ def chat_display_format(text: str):
 with gr.Blocks() as setting:
     with gr.Row():
         setting_path = gr.Textbox(value=r"D:\models\01yi-6b-Q4_K_M.gguf", label="模型路径", scale=2)
+        setting_cache_path = gr.Textbox(value=r"cache/01yi-6b-Q4_K_M.pkl", label="缓存路径", scale=1)
         setting_seed = gr.Number(value=0xFFFFFFFF, label="随机种子", scale=1)
         setting_n_gpu_layers = gr.Number(value=33, label="n_gpu_layers", scale=1)
     with gr.Row():
@@ -130,28 +132,53 @@ with gr.Blocks() as role:
     role_chat_style = gr.Textbox(value=role_chat_style, lines=10, max_lines=99, label="回复示例")
     role_char_first = gr.Textbox(value=role_char_first, lines=10, max_lines=99, label="第一条消息")
 
-    # ========== 加载角色卡-角色描述 ==========
-    # 这个暖机的 bos [1] 删了就不正常了
-    tmp = [1] + chat_template('system',
-                              text_format(role_char_d.value,
-                                          char=role_char.value,
-                                          user=role_usr.value))
-    setting_n_keep.value = model.eval_t(tmp)  # 此内容永久存在
+    model.eval_t([1])  # 这个暖机的 bos [1] 删了就不正常了
+    if os.path.exists(setting_cache_path.value):
+        # ========== 加载角色卡-缓存 ==========
+        tmp = model.load_session(setting_cache_path.value)
+        print(f'load cache from {setting_cache_path.value} {tmp}')
+        tmp = chat_template('system',
+                            text_format(role_char_d.value,
+                                        char=role_char.value,
+                                        user=role_usr.value))
+        setting_n_keep.value = 1 + len(tmp)
+        tmp = chat_template(role_char.value,
+                            text_format(role_chat_style.value,
+                                        char=role_char.value,
+                                        user=role_usr.value))
+        setting_n_keep.value += len(tmp)
+        tmp = text_format(role_char_first.value,
+                          char=role_char.value,
+                          user=role_usr.value)
+        chatbot = [(None, chat_display_format(tmp))]
+    else:
+        # ========== 加载角色卡-角色描述 ==========
+        tmp = chat_template('system',
+                            text_format(role_char_d.value,
+                                        char=role_char.value,
+                                        user=role_usr.value))
+        setting_n_keep.value = model.eval_t(tmp)  # 此内容永久存在
 
-    # ========== 加载角色卡-回复示例 ==========
-    tmp = chat_template(role_char.value,
-                        text_format(role_chat_style.value,
-                                    char=role_char.value,
-                                    user=role_usr.value))
-    setting_n_keep.value = model.eval_t(tmp)  # 此内容永久存在
+        # ========== 加载角色卡-回复示例 ==========
+        tmp = chat_template(role_char.value,
+                            text_format(role_chat_style.value,
+                                        char=role_char.value,
+                                        user=role_usr.value))
+        setting_n_keep.value = model.eval_t(tmp)  # 此内容永久存在
 
-    # ========== 加载角色卡-第一条消息 ==========
-    tmp = text_format(role_char_first.value,
-                      char=role_char.value,
-                      user=role_usr.value)
-    chatbot = [(None, chat_display_format(tmp))]
-    tmp = chat_template(role_char.value, tmp)
-    model.eval_t(tmp)  # 此内容随上下文增加将被丢弃
+        # ========== 加载角色卡-第一条消息 ==========
+        tmp = text_format(role_char_first.value,
+                          char=role_char.value,
+                          user=role_usr.value)
+        chatbot = [(None, chat_display_format(tmp))]
+        tmp = chat_template(role_char.value, tmp)
+        model.eval_t(tmp)  # 此内容随上下文增加将被丢弃
+
+        # ========== 保存角色卡-缓存 ==========
+        with open(setting_cache_path.value, 'wb') as f:
+            pass
+        tmp = model.save_session(setting_cache_path.value)
+        print(f'save cache {tmp}')
 
 
 # ========== 显示用户消息 ==========
@@ -222,6 +249,12 @@ def btn_submit_bot(history, _n_keep, _n_discard,
     yield history, model.n_tokens
 
 
+# ========== 待实现 ==========
+def btn_rag_(_rag, _msg):
+    retn = ''
+    return retn
+
+
 # ========== 聊天页面 ==========
 with gr.Blocks() as chatting:
     with gr.Row(equal_height=True):
@@ -241,6 +274,9 @@ with gr.Blocks() as chatting:
     with gr.Row():
         s_n_tokens = gr.Number(value=model.n_tokens, label='n_tokens')
 
+    btn_rag.click(fn=btn_rag_, outputs=rag,
+                  inputs=[rag, msg])
+
     btn_submit.click(fn=btn_submit_usr, api_name="submit",
                      inputs=[msg, chatbot],
                      outputs=[msg, chatbot]).then(
@@ -254,8 +290,9 @@ with gr.Blocks() as chatting:
                 rag, setting_max_tokens],
         outputs=[chatbot, s_n_tokens]
     )
-    btn_com1.click(fn=lambda: model.str_detokenize(model._input_ids), outputs=rag)
 
+    # ========== 用于调试 ==========
+    btn_com1.click(fn=lambda: model.str_detokenize(model._input_ids), outputs=rag)
 
 # ========== 开始运行 ==========
 demo = gr.TabbedInterface([chatting, setting, role],

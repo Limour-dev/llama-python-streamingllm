@@ -1,7 +1,7 @@
 from typing import Optional, Sequence, Generator
 
 from llama_cpp import Llama, LogitsProcessorList, LlamaGrammar, llama_cpp, npt, np, StoppingCriteriaList
-
+from ctypes import POINTER
 
 def is_UTF8_incomplete(all_text):
     multibyte_fix = 0
@@ -100,7 +100,7 @@ class StreamingLLM(Llama):
         last_n_tokens_data_c = (llama_cpp.llama_token * last_n_tokens_size)(
             *last_n_tokens_data
         )
-        logits: npt.NDArray[np.single] = self.scores[self.n_tokens-1: self.n_tokens, :].ravel()
+        logits: npt.NDArray[np.single] = self.scores[self.n_tokens - 1: self.n_tokens, :].ravel()
 
         if logits_processor is not None:
             logits[:] = logits_processor(self._input_ids, logits)
@@ -209,10 +209,29 @@ class StreamingLLM(Llama):
                 grammar=grammar,
             )
             if stopping_criteria is not None and stopping_criteria(
-                self._input_ids, self._scores[-1, :]
+                    self._input_ids, self._scores[-1, :]
             ):
                 return
             tokens_or_none = yield token
             tokens = [token]
             if tokens_or_none is not None:
                 tokens.extend(tokens_or_none)
+
+    def load_session(self, filepath: str):
+        n_tokens = POINTER(llama_cpp.c_size_t)(llama_cpp.c_size_t(0))
+        tokens = (llama_cpp.llama_token * self.n_ctx())()
+        retn = llama_cpp.llama_load_session_file(self._ctx.ctx,
+                                                 filepath.encode('utf-8'),
+                                                 tokens,
+                                                 self.n_ctx(),
+                                                 n_tokens)
+        self.n_tokens = n_tokens.contents.value
+        self.input_ids[:self.n_tokens] = tokens[:self.n_tokens]
+        return retn
+
+    def save_session(self, filepath: str):
+        # self.eval_t([0])  # https://github.com/ggerganov/llama.cpp/pull/4820
+        # self.n_tokens -= 1
+        tokens = self._input_ids.tolist()
+        tokens = (llama_cpp.llama_token * len(tokens))(*tokens)
+        return llama_cpp.llama_save_session_file(self._ctx.ctx, filepath.encode('utf-8'), tokens, self.n_tokens)

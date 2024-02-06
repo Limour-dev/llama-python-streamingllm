@@ -1,0 +1,13 @@
+在llama-cpp-python中实现streaming_llm
+conda create -n llamaCpp libcublas cuda-toolkit git -c nvidia -c conda-forge
+conda activate llamaCpp
+conda install python=3.10 -c conda-forge
+# python -m pip install llama-cpp-python --force-reinstall --prefer-binary --extra-index-url=https://jllllll.github.io/llama-cpp-python-cuBLAS-wheels/AVX2/cu121
+# 狗屎 9代i5没有avx512 导致avx512版本的llama.dll一直初始化失败
+# os.add_dll_directory(os.path.join(os.environ["CONDA_PREFIX"],"bin"))
+# 上面这个预编译版本太老了。。。
+# 自己 fork 一下 https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels
+# 然后手动执行一下对应的 actions 吧 tag 填最新的 v0.2.39 注意不要有空格之类的
+# 然后去 release 下载相应的包 https://github.com/Limour-dev/llama-cpp-python-cuBLAS-wheels/releases
+pip install --force-reinstall llama_cpp_python-0.2.39+cu122-cp310-cp310-win_amd64.whl
+conda install gradio -c conda-forge
