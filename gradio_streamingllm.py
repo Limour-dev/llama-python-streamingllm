@@ -387,7 +387,18 @@ with gr.Blocks() as chatting:
     # ========== 用于调试 ==========
     btn_com1.click(fn=lambda: model.str_detokenize(model._input_ids), outputs=rag)
 
-# ========== 开始运行 ==========
+
+    @btn_com2.click(inputs=setting_cache_path,
+                    outputs=s_info)
+    def btn_com2(_cache_path):
+        tmp = model.load_session(setting_cache_path.value)
+        print(f'load cache from {setting_cache_path.value} {tmp}')
+        global vo_idx
+        vo_idx = 0
+        model.venv = [0]
+        return str((model.n_tokens, model.venv))
+
+    # ========== 开始运行 ==========
 demo = gr.TabbedInterface([chatting, setting, role],
                           ["聊天", "设置", '角色'],
                           css=custom_css)
