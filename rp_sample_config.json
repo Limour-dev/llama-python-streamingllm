@@ -21,74 +21,87 @@
 		"maximum": 4095
 	},
 	"setting_temperature": {
-		"value": 0.6,
-		"step": 0.1
+		"value": 0.7,
+		"step": 0.1,
+		"info": "温度设置：通过缩放概率而不删除选项来控制输出的「随机」程度。较低的值更合乎逻辑，但创意较差。可以根据需要随时调整。"
 	},
 	"setting_repeat_penalty": {
 		"value": 1.1,
 		"minimum": 0,
 		"maximum": 2,
-		"step": 0.1
+		"step": 0.1,
+		"info": "重复惩罚：应用惩罚以减少最近已经使用的单词的重复，使 AI 的输出减少重复。"
 	},
 	"setting_frequency_penalty": {
 		"value": 0,
 		"minimum": 0,
 		"maximum": 2,
-		"step": 0.1
+		"step": 0.1,
+		"info": "频率惩罚：应用惩罚以减少最近已经使用的单词的重复，使 AI 的输出减少重复。将值设置为 0 以禁用其效果。"
 	},
 	"setting_presence_penalty": {
 		"value": 0,
 		"minimum": 0,
 		"maximum": 2,
-		"step": 0.1
+		"step": 0.1,
+		"info": "存在惩罚：应用惩罚以减少指定范围内已经使用的单词的重复，使 AI 的输出减少重复。将值设置为 0 以禁用其效果。"
 	},
 	"setting_repeat_last_n": {
-		"value": 64,
+		"value": 1200,
 		"minimum": 0,
-		"maximum": 4095
+		"maximum": 4095,
+		"info": "惩罚时会考虑的最近的 tokens 数量"
 	},
 	"setting_top_k": {
 		"value": 40,
-		"minimum": 0
+		"minimum": 0,
+		"info": "此设置将可供选择的可能字词数量限制为前 K 个最有可能的选项，并删除其他所有内容。可与 Top-P 一起使用。将值设置为 0 以禁用其效果。"
 	},
 	"setting_top_p": {
-		"value": 0.8,
+		"value": 0.92,
 		"minimum": 0,
 		"maximum": 1,
-		"step": 0.1
+		"step": 0.1,
+		"info": "在采样过程中丢弃不太可能的文本。仅考虑累积概率总和为 P 的单词。低值使文本可预测，因为删除了不常见的标记。将值设置为 1 以禁用其效果。"
 	},
 	"setting_min_p": {
 		"value": 0.05,
 		"minimum": 0,
 		"maximum": 1,
-		"step": 0.01
+		"step": 0.01,
+		"info": "作为 Top-P 的替代项，相对于最可能的令牌的概率，令牌被考虑的最小概率。例如，当p=0.05且最可能的令牌的概率为0.9时，数值小于0.045的logits将被过滤掉。"
 	},
 	"setting_typical_p": {
 		"value": 1,
 		"minimum": 0,
 		"maximum": 1,
-		"step": 0.01
+		"step": 0.01,
+		"info": "典型采样：从可能的单词清单中随机选择单词，每个单词都有相等的机会被选中。此方法可以生成更多样化的文本，但也可能不太连贯。将值设置为 1 以禁用其效果。"
 	},
 	"setting_tfs_z": {
 		"value": 1,
 		"minimum": 0,
 		"maximum": 1,
-		"step": 0.01
+		"step": 0.01,
+		"info": "无尾采样：作为 Top-P 的替代项，此设置在文本生成过程中从考虑范围中删除最不可能的单词，考虑二阶导数。可以提高生成的文本的质量和连贯性。将值设置为 1 以禁用其效果。"
 	},
 	"setting_mirostat_mode": {
 		"value": 0,
 		"minimum": 0,
-		"maximum": 2
+		"maximum": 2,
+		"info": "覆盖其他采样器的替代采样方法。将值设置为 0 以禁用其效果。"
 	},
 	"setting_mirostat_eta": {
 		"value": 0.1,
 		"minimum": 0,
-		"step": 0.01
+		"step": 0.01,
+		"info": "学习率影响算法对生成文本的反馈作出反应的速度。较低的学习率会导致调整较慢，而较高的学习率会使算法更具响应性。"
 	},
 	"setting_mirostat_tau": {
 		"value": 5,
 		"minimum": 0,
-		"step": 0.1
+		"step": 0.1,
+		"info": "调整目标熵可以控制生成文本中连贯性和多样性之间的平衡。较低的数值会导致更加集中和连贯的文本，而较高的数值则会导致更多样化但潜在地更不连贯的文本。"
 	},
 	"msg": {
 		"value": "我亲爱的妹妹，早上好"
