@@ -111,7 +111,6 @@ with gr.Blocks() as setting:
     setting_ctx.value = model.n_ctx()
 
 # ========== 聊天的模版 默认 chatml ==========
-eos = (2, 7)  # [eos, im_end]
 chat_template = ChatTemplate(model)
 
 # ========== 展示角色卡 ==========
@@ -218,8 +217,9 @@ def btn_submit_com(_n_keep, _n_discard,
             mirostat_tau=_mirostat_tau,
             mirostat_eta=_mirostat_eta,
     ):
-        if token in eos:
+        if token in chat_template.eos or token == chat_template.nlnl:
             t_bot.extend(completion_tokens)
+            print('token in eos', token)
             break
         completion_tokens.append(token)
         all_text = model.str_detokenize(completion_tokens)
@@ -228,13 +228,23 @@ def btn_submit_com(_n_keep, _n_discard,
         t_bot.extend(completion_tokens)
         history += all_text
         yield history
-        if len(t_bot) > _max_tokens or (all_text == '\n' and history[-2:-1] == '\n'):
+        if token in chat_template.onenl:
+            # ========== 移除末尾的换行符 ==========
+            if t_bot[-2] in chat_template.onenl:
+                model.venv_pop_token()
+                break
+            if t_bot[-2] in chat_template.onerl and t_bot[-3] in chat_template.onenl:
+                model.venv_pop_token()
+                break
+        if history[-2:] == '\n\n':  # 各种 'x\n\n' 的token，比如'。\n\n'
+            print('t_bot[-4:]', t_bot[-4:], repr(model.str_detokenize(t_bot[-4:])),
+                  repr(model.str_detokenize(t_bot[-1:])))
+            break
+        if len(t_bot) > _max_tokens:
             break
         completion_tokens = []
-    # ========== 移除末尾的换行符 ==========
-    if model.str_detokenize(t_bot[-2:]) == '\n\n':
-        print('completion_tokens', completion_tokens)
-        model.venv_pop_token()
+    # ========== 查看末尾的换行符 ==========
+    print('history', repr(history))
     # ========== 给 kv_cache 加上输出结束符 ==========
     model.eval_t(chat_template.im_end_nl, _n_keep, _n_discard)
     t_bot.extend(chat_template.im_end_nl)
@@ -245,7 +255,7 @@ def btn_submit_usr(message: str, history):
     # print('btn_submit_usr', message, history)
     if history is None:
         history = []
-    return "", history + [[message.strip(), '']]
+    return "", history + [[message.strip(), '']], gr.update(interactive=False)
 
 
 # ========== 模型流式响应 ==========
@@ -370,7 +380,7 @@ with gr.Blocks() as chatting:
     btn_submit.click(
         fn=btn_submit_usr, api_name="submit",
         inputs=[msg, chatbot],
-        outputs=[msg, chatbot]
+        outputs=[msg, chatbot, btn_submit]
     ).then(
         fn=btn_submit_bot,
         inputs=[chatbot, setting_n_keep, setting_n_discard,
@@ -399,6 +409,9 @@ with gr.Blocks() as chatting:
                 setting_tfs_z, setting_mirostat_mode, setting_mirostat_eta,
                 setting_mirostat_tau, role_usr, setting_max_tokens],
         outputs=[msg, s_info]
+    ).then(
+        fn=lambda: gr.update(interactive=True),
+        outputs=btn_submit
     )
 
     # ========== 用于调试 ==========
@@ -408,8 +421,8 @@ with gr.Blocks() as chatting:
     @btn_com2.click(inputs=setting_cache_path,
                     outputs=s_info)
     def btn_com2(_cache_path):
-        tmp = model.load_session(setting_cache_path.value)
-        print(f'load cache from {setting_cache_path.value} {tmp}')
+        _tmp = model.load_session(setting_cache_path.value)
+        print(f'load cache from {setting_cache_path.value} {_tmp}')
         global vo_idx
         vo_idx = 0
         model.venv = [0]

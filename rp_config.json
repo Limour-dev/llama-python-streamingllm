@@ -1,6 +1,6 @@
 {
 	"setting_path": {
-		"value": "D:\\models\\01yi-6b-Q4_K_M.gguf"
+		"value": "D:\\models\\causallm_7b.Q5_K_M.gguf"
 	},
 	"role_usr": {
 		"value": "无忌"
