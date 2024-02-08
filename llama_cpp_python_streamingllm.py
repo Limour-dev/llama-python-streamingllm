@@ -3,6 +3,9 @@ from typing import Optional, Sequence, Generator
 from llama_cpp import Llama, LogitsProcessorList, LlamaGrammar, llama_cpp, npt, np, StoppingCriteriaList
 from ctypes import POINTER
 
+from KMP_list import kmp_search, compute_lps_array
+
+
 def is_UTF8_incomplete(all_text):
     multibyte_fix = 0
     if len(all_text) < 3:
@@ -26,27 +29,67 @@ def get_complete_UTF8(all_text):
 
 
 class StreamingLLM(Llama):
+    def __init__(self, model_path: str, **kwargs):
+        super().__init__(model_path, **kwargs)
+        self.venv = [0]
 
     def str_detokenize(self, tokens) -> str:
         return get_complete_UTF8(self.detokenize(tokens))
 
-    def kv_cache_seq_trim(self, start_pos):
-        self._ctx.kv_cache_seq_rm(-1, start_pos, -1)
-        self.n_tokens = start_pos
+    def kv_cache_seq_trim(self, start_pos=-1):
+        if start_pos >= 0:
+            self._ctx.kv_cache_seq_rm(-1, start_pos, -1)
+            self.n_tokens = start_pos
+        else:
+            self._ctx.kv_cache_seq_rm(-1, self.n_tokens, -1)
 
-    def kv_cache_seq_ltrim(self, n_keep, n_discard=256, n_past=-1):
-        self._ctx.kv_cache_seq_rm(-1, n_keep, n_keep + n_discard)
+    def venv_create(self):
+        self.venv.append(0)
+        return len(self.venv) - 1
+
+    def venv_disband(self):
+        if len(self.venv) <= 1:
+            return 0
+        self.venv[-1] += self.venv.pop()
+        return len(self.venv) - 1
+
+    def venv_remove(self, venv_idx=None):
+        if venv_idx is None:
+            venv_idx = len(self.venv) - 1
+        if venv_idx <= 0 or venv_idx >= len(self.venv):
+            return len(self.venv) - 1
+        if venv_idx == len(self.venv) - 1:
+            # 最后一层
+            self.n_tokens -= min(self.venv.pop(), self.n_tokens)
+            self.kv_cache_seq_trim()
+        else:
+            # 非最后一层
+            n_keep = self.n_tokens - sum(self.venv[i] for i in range(venv_idx, len(self.venv)))
+            n_discard = self.venv.pop(venv_idx)
+            self.kv_cache_seq_ltrim(n_keep, n_discard)
+        return len(self.venv) - 1
+
+    def kv_cache_seq_ltrim(self, n_keep, n_discard=256, n_past=-1, im_start=None):
         if n_past < 0:
             n_past = self.n_tokens
+        if im_start is not None:  # [<|im_start|>, name, nl]
+            lps = compute_lps_array(im_start)
+            _idx = kmp_search(self.input_ids, im_start, n_keep + n_discard, n_past, lps)
+            if _idx >= n_keep:  # 其实是大于等于 n_keep + n_discard
+                n_discard = _idx - n_keep  # 截断到最近的 im_start 序列结构
+            else:
+                _idx = kmp_search(self.input_ids, im_start, n_keep, n_past, lps)
+                if _idx >= n_keep:
+                    n_keep = _idx + len(im_start)  # 至少保留一个 im_start 序列结构
+        self._ctx.kv_cache_seq_rm(-1, n_keep, n_keep + n_discard)
         self._ctx.kv_cache_seq_shift(0, n_keep + n_discard, n_past, -n_discard)
         self.input_ids[n_keep:n_past - n_discard] = self.input_ids[n_keep + n_discard:n_past]
         self.n_tokens = n_past - n_discard
 
-    def eval_t(self, tokens, n_keep=4, n_discard=256):
+    def eval_t(self, tokens, n_keep=4, n_discard=256, im_start=None):
         if self._n_ctx < self.n_tokens + len(tokens):
             tmp_n_discard = max(n_discard, self.n_tokens + len(tokens) - self._n_ctx)
-            self.kv_cache_seq_ltrim(n_keep, tmp_n_discard)
-        # self._ctx.kv_cache_seq_rm(-1, self.n_tokens, -1)
+            self.kv_cache_seq_ltrim(n_keep, tmp_n_discard, im_start)
         for i in range(0, len(tokens), self.n_batch):
             batch = tokens[i: i + self.n_batch]
             n_past = self.n_tokens
@@ -68,6 +111,7 @@ class StreamingLLM(Llama):
             ] = self._ctx.get_logits()[offset * cols: rows * cols]
             # Update n_tokens
             self.n_tokens += n_tokens
+            self.venv[-1] += n_tokens
         return self.n_tokens
 
     def sample_t(
@@ -167,6 +211,7 @@ class StreamingLLM(Llama):
             tokens: Sequence[int],
             n_keep,
             n_discard: int = 256,
+            im_start=None,
             top_k: int = 40,
             top_p: float = 0.95,
             min_p: float = 0.05,

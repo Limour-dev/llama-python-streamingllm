@@ -23,6 +23,7 @@ custom_css = r'''
 }
 #RAG-area > label > textarea {
     flex-grow: 1;
+    max-height: 20vh;
 }
 #VO-area {
     flex-grow: 1;
@@ -34,6 +35,10 @@ custom_css = r'''
 }
 #VO-area > label > textarea {
     flex-grow: 1;
+    max-height: 20vh;
+}
+#prompt > label > textarea {
+    max-height: 63px;
 }
 '''
 
@@ -72,14 +77,13 @@ def chat_display_format(text: str):
 #  ========== 温度、采样之类的设置 ==========
 with gr.Blocks() as setting:
     with gr.Row():
-        setting_path = gr.Textbox(label="模型路径", scale=2, **cfg['setting_path'])
-        setting_cache_path = gr.Textbox(label="缓存路径", scale=1, **cfg['setting_cache_path'])
+        setting_path = gr.Textbox(label="模型路径", max_lines=1, scale=2, **cfg['setting_path'])
+        setting_cache_path = gr.Textbox(label="缓存路径", max_lines=1, scale=2, **cfg['setting_cache_path'])
         setting_seed = gr.Number(label="随机种子", scale=1, **cfg['setting_seed'])
         setting_n_gpu_layers = gr.Number(label="n_gpu_layers", scale=1, **cfg['setting_n_gpu_layers'])
     with gr.Row():
         setting_ctx = gr.Number(label="上下文大小（Tokens）", **cfg['setting_ctx'])
         setting_max_tokens = gr.Number(label="最大响应长度（Tokens）", interactive=True, **cfg['setting_max_tokens'])
-    with gr.Row():
         setting_n_keep = gr.Number(value=10, label="n_keep", interactive=False)
         setting_n_discard = gr.Number(label="n_discard", interactive=True, **cfg['setting_n_discard'])
     with gr.Row():
@@ -113,12 +117,12 @@ chat_template = ChatTemplate(model)
 # ========== 展示角色卡 ==========
 with gr.Blocks() as role:
     with gr.Row():
-        role_usr = gr.Textbox(label="用户名称", interactive=False, **cfg['role_usr'])
-        role_char = gr.Textbox(label="角色名称", interactive=False, **cfg['role_char'])
+        role_usr = gr.Textbox(label="用户名称", max_lines=1, interactive=False, **cfg['role_usr'])
+        role_char = gr.Textbox(label="角色名称", max_lines=1, interactive=False, **cfg['role_char'])
 
-    role_char_d = gr.Textbox(lines=10, max_lines=99, label="角色描述", **cfg['role_char_d'])
-    role_chat_style = gr.Textbox(lines=10, max_lines=99, label="回复示例", **cfg['role_chat_style'])
-    role_char_first = gr.Textbox(lines=10, max_lines=99, label="第一条消息", **cfg['role_char_first'])
+    role_char_d = gr.Textbox(lines=10, label="角色描述", **cfg['role_char_d'])
+    role_chat_style = gr.Textbox(lines=10, label="回复示例", **cfg['role_chat_style'])
+    role_char_first = gr.Textbox(lines=10, label="第一条消息", **cfg['role_char_first'])
 
     # model.eval_t([1])  # 这个暖机的 bos [1] 删了就不正常了
     if os.path.exists(setting_cache_path.value):
@@ -169,35 +173,23 @@ with gr.Blocks() as role:
         print(f'save cache {tmp}')
 
 
-# ========== 显示用户消息 ==========
-def btn_submit_usr(message, history):
-    # print('btn_submit_usr', message, history)
-    if history is None:
-        history = []
-    return "", history + [[message, '']]
-
-
-# ========== 模型流式响应 ==========
-def btn_submit_bot(history, _n_keep, _n_discard,
+# ========== 流式输出函数 ==========
+def btn_submit_com(_n_keep, _n_discard,
                    _temperature, _repeat_penalty, _frequency_penalty,
                    _presence_penalty, _repeat_last_n, _top_k,
                    _top_p, _min_p, _typical_p,
                    _tfs_z, _mirostat_mode, _mirostat_eta,
-                   _mirostat_tau, _usr, _char,
-                   _rag, _max_tokens):
-    if len(_rag) > 0:  # 需要临时注入的内容
-        t_rag = chat_template('system', _rag)
-        model.eval_t(t_rag, _n_keep, _n_discard)
-    t_msg = history[-1][0]
-    t_msg = chat_template(_usr, t_msg)
-    model.eval_t(t_msg, _n_keep, _n_discard)
-    t_bot = chat_template(_char)
-    completion_tokens = []
-    token = None
+                   _mirostat_tau, _role, _max_tokens):
+    # ========== 初始化输出模版 ==========
+    t_bot = chat_template(_role)
+    completion_tokens = []  # 有可能多个 tokens 才能构成一个 utf-8 编码的文字
+    history = ''
+    # ========== 流式输出 ==========
     for token in model.generate_t(
             tokens=t_bot,
             n_keep=_n_keep,
             n_discard=_n_discard,
+            im_start=chat_template(_role),  # 深拷贝
             top_k=_top_k,
             top_p=_top_p,
             min_p=_min_p,
@@ -220,21 +212,70 @@ def btn_submit_bot(history, _n_keep, _n_discard,
         if not all_text:
             continue
         t_bot.extend(completion_tokens)
-        completion_tokens = []
-        history[-1][1] += all_text
-        yield history, model.n_tokens
-        if len(t_bot) > _max_tokens:
+        history += all_text
+        yield history
+        if len(t_bot) > _max_tokens or (all_text == '\n' and history[-2:-1] == '\n'):
             break
-    history[-1][1] = chat_display_format(history[-1][1])
-    yield history, model.n_tokens
+        completion_tokens = []
+    # ========== 移除末尾的换行符 ==========
+    if model.str_detokenize(t_bot[-2:]) == '\n\n':
+        print('completion_tokens', completion_tokens)
+        model.n_tokens -= 1
+    # ========== 给 kv_cache 加上输出结束符 ==========
     model.eval_t(chat_template.im_end_nl, _n_keep, _n_discard)
     t_bot.extend(chat_template.im_end_nl)
-    if len(_rag) > 0:  # 响应完毕后清除注入的内容
-        # history t_rag t_msg t_bot -> history t_msg t_bot
-        n_discard = len(t_rag)
-        n_keep = model.n_tokens - len(t_bot) - len(t_msg) - len(t_rag)
-        model.kv_cache_seq_ltrim(n_keep, n_discard)
-    yield history, model.n_tokens
+
+
+# ========== 显示用户消息 ==========
+def btn_submit_usr(message: str, history):
+    # print('btn_submit_usr', message, history)
+    if history is None:
+        history = []
+    return "", history + [[message.strip(), '']]
+
+
+# ========== 模型流式响应 ==========
+def btn_submit_bot(history, _n_keep, _n_discard,
+                   _temperature, _repeat_penalty, _frequency_penalty,
+                   _presence_penalty, _repeat_last_n, _top_k,
+                   _top_p, _min_p, _typical_p,
+                   _tfs_z, _mirostat_mode, _mirostat_eta,
+                   _mirostat_tau, _usr, _char,
+                   _rag, _max_tokens):
+    # ========== 需要临时注入的内容 ==========
+    rag_idx = None
+    if len(_rag) > 0:
+        rag_idx = model.venv_create()  # 记录 venv_idx
+        t_rag = chat_template('system', _rag)
+        model.eval_t(t_rag, _n_keep, _n_discard)
+    model.venv_create()  # 与 t_rag 隔离
+    # ========== 用户输入 ==========
+    t_msg = history[-1][0]
+    t_msg = chat_template(_usr, t_msg)
+    model.eval_t(t_msg, _n_keep, _n_discard)
+    # ========== 模型输出 ==========
+    _tmp = btn_submit_com(_n_keep, _n_discard,
+                          _temperature, _repeat_penalty, _frequency_penalty,
+                          _presence_penalty, _repeat_last_n, _top_k,
+                          _top_p, _min_p, _typical_p,
+                          _tfs_z, _mirostat_mode, _mirostat_eta,
+                          _mirostat_tau, _char, _max_tokens)
+    for _h in _tmp:
+        history[-1][1] = _h
+        yield history, str((model.n_tokens, model.venv))
+    # ========== 输出完毕后格式化输出 ==========
+    history[-1][1] = chat_display_format(history[-1][1])
+    yield history, str((model.n_tokens, model.venv))
+    # ========== 及时清理上一次生成的旁白 ==========
+    if vo_idx > 0:
+        model.venv_remove(vo_idx)
+        if rag_idx and vo_idx < rag_idx:
+            rag_idx -= 1
+    # ========== 响应完毕后清除注入的内容 ==========
+    if rag_idx is not None:
+        model.venv_remove(rag_idx)  # 销毁对应的 venv
+    model.venv_disband()  # 退出隔离环境
+    yield history, str((model.n_tokens, model.venv))
 
 
 # ========== 待实现 ==========
@@ -243,18 +284,61 @@ def btn_rag_(_rag, _msg):
     return retn
 
 
+vo_idx = 0
+
+
+# ========== 输出一段旁白 ==========
+def btn_submit_vo(_n_keep, _n_discard,
+                  _temperature, _repeat_penalty, _frequency_penalty,
+                  _presence_penalty, _repeat_last_n, _top_k,
+                  _top_p, _min_p, _typical_p,
+                  _tfs_z, _mirostat_mode, _mirostat_eta,
+                  _mirostat_tau, _max_tokens):
+    global vo_idx
+    vo_idx = model.venv_create()  # 创建隔离环境
+    # ========== 模型输出旁白 ==========
+    _tmp = btn_submit_com(_n_keep, _n_discard,
+                          _temperature, _repeat_penalty, _frequency_penalty,
+                          _presence_penalty, _repeat_last_n, _top_k,
+                          _top_p, _min_p, _typical_p,
+                          _tfs_z, _mirostat_mode, _mirostat_eta,
+                          _mirostat_tau, '旁白', _max_tokens)
+    for _h in _tmp:
+        yield _h, str((model.n_tokens, model.venv))
+
+
+# ========== 给用户提供默认回复 ==========
+def btn_submit_suggest(_n_keep, _n_discard,
+                       _temperature, _repeat_penalty, _frequency_penalty,
+                       _presence_penalty, _repeat_last_n, _top_k,
+                       _top_p, _min_p, _typical_p,
+                       _tfs_z, _mirostat_mode, _mirostat_eta,
+                       _mirostat_tau, _usr, _max_tokens):
+    model.venv_create()  # 创建隔离环境
+    # ========== 模型输出 ==========
+    _tmp = btn_submit_com(_n_keep, _n_discard,
+                          _temperature, _repeat_penalty, _frequency_penalty,
+                          _presence_penalty, _repeat_last_n, _top_k,
+                          _top_p, _min_p, _typical_p,
+                          _tfs_z, _mirostat_mode, _mirostat_eta,
+                          _mirostat_tau, _usr, _max_tokens)
+    _h = ''
+    for _h in _tmp:
+        yield _h, str((model.n_tokens, model.venv))
+    model.venv_remove()  # 销毁隔离环境
+    yield _h, str((model.n_tokens, model.venv))
+
+
 # ========== 聊天页面 ==========
 with gr.Blocks() as chatting:
     with gr.Row(equal_height=True):
         chatbot = gr.Chatbot(height='60vh', scale=2, value=chatbot,
                              avatar_images=(r'assets/user.png', r'assets/chatbot.webp'))
         with gr.Column(scale=1, elem_id="area"):
-            rag = gr.Textbox(label='RAG', lines=2, max_lines=999,
-                             show_copy_button=True, elem_id="RAG-area")
-            vo = gr.Textbox(label='VO', lines=2, max_lines=999,
-                            show_copy_button=True, elem_id="VO-area")
-            s_n_tokens = gr.Number(value=model.n_tokens, label='n_tokens')
-    msg = gr.Textbox(label='Prompt', lines=2)
+            rag = gr.Textbox(label='RAG', show_copy_button=True, elem_id="RAG-area")
+            vo = gr.Textbox(label='VO', show_copy_button=True, elem_id="VO-area")
+            s_info = gr.Textbox(value=str((model.n_tokens, model.venv)), max_lines=1, label='info', interactive=False)
+    msg = gr.Textbox(label='Prompt', lines=2, max_lines=2, elem_id='prompt', autofocus=True, **cfg['msg'])
     with gr.Row():
         btn_rag = gr.Button("RAG")
         btn_submit = gr.Button("Submit")
@@ -266,9 +350,11 @@ with gr.Blocks() as chatting:
     btn_rag.click(fn=btn_rag_, outputs=rag,
                   inputs=[rag, msg])
 
-    btn_submit.click(fn=btn_submit_usr, api_name="submit",
-                     inputs=[msg, chatbot],
-                     outputs=[msg, chatbot]).then(
+    btn_submit.click(
+        fn=btn_submit_usr, api_name="submit",
+        inputs=[msg, chatbot],
+        outputs=[msg, chatbot]
+    ).then(
         fn=btn_submit_bot,
         inputs=[chatbot, setting_n_keep, setting_n_discard,
                 setting_temperature, setting_repeat_penalty, setting_frequency_penalty,
@@ -277,7 +363,25 @@ with gr.Blocks() as chatting:
                 setting_tfs_z, setting_mirostat_mode, setting_mirostat_eta,
                 setting_mirostat_tau, role_usr, role_char,
                 rag, setting_max_tokens],
-        outputs=[chatbot, s_n_tokens]
+        outputs=[chatbot, s_info]
+    ).then(
+        fn=btn_submit_vo,
+        inputs=[setting_n_keep, setting_n_discard,
+                setting_temperature, setting_repeat_penalty, setting_frequency_penalty,
+                setting_presence_penalty, setting_repeat_last_n, setting_top_k,
+                setting_top_p, setting_min_p, setting_typical_p,
+                setting_tfs_z, setting_mirostat_mode, setting_mirostat_eta,
+                setting_mirostat_tau, setting_max_tokens],
+        outputs=[vo, s_info]
+    ).then(
+        fn=btn_submit_suggest,
+        inputs=[setting_n_keep, setting_n_discard,
+                setting_temperature, setting_repeat_penalty, setting_frequency_penalty,
+                setting_presence_penalty, setting_repeat_last_n, setting_top_k,
+                setting_top_p, setting_min_p, setting_typical_p,
+                setting_tfs_z, setting_mirostat_mode, setting_mirostat_eta,
+                setting_mirostat_tau, role_usr, setting_max_tokens],
+        outputs=[msg, s_info]
     )
 
     # ========== 用于调试 ==========
