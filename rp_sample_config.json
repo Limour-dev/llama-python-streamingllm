@@ -6,10 +6,7 @@
 		"value": 4294967295
 	},
 	"setting_n_gpu_layers": {
-		"value": 23
-	},
-	"setting_ctx": {
-		"value": 4096
+		"value": 20
 	},
 	"setting_max_tokens": {
 		"value": 1024,

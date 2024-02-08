@@ -2,6 +2,9 @@
 	"setting_path": {
 		"value": "D:\\models\\causallm_7b.Q5_K_M.gguf"
 	},
+	"setting_ctx": {
+		"value": 4095
+	},
 	"role_usr": {
 		"value": "无忌"
 	},
