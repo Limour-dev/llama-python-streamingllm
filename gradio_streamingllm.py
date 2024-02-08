@@ -108,7 +108,7 @@ with gr.Blocks() as setting:
                          seed=setting_seed.value,
                          n_gpu_layers=setting_n_gpu_layers.value,
                          n_ctx=setting_ctx.value)
-    setting_ctx.value = model.context_params.n_ctx
+    setting_ctx.value = model.n_ctx()
 
 # ========== 聊天的模版 默认 chatml ==========
 eos = (2, 7)  # [eos, im_end]
@@ -120,9 +120,8 @@ with gr.Blocks() as role:
         role_usr = gr.Textbox(label="用户名称", max_lines=1, interactive=False, **cfg['role_usr'])
         role_char = gr.Textbox(label="角色名称", max_lines=1, interactive=False, **cfg['role_char'])
 
-    role_char_d = gr.Textbox(lines=10, label="角色描述", **cfg['role_char_d'])
+    role_char_d = gr.Textbox(lines=10, label="故事描述", **cfg['role_char_d'])
     role_chat_style = gr.Textbox(lines=10, label="回复示例", **cfg['role_chat_style'])
-    role_char_first = gr.Textbox(lines=10, label="第一条消息", **cfg['role_char_first'])
 
     # model.eval_t([1])  # 这个暖机的 bos [1] 删了就不正常了
     if os.path.exists(setting_cache_path.value):
@@ -133,16 +132,24 @@ with gr.Blocks() as role:
                             text_format(role_char_d.value,
                                         char=role_char.value,
                                         user=role_usr.value))
-        setting_n_keep.value = 1 + len(tmp)
+        setting_n_keep.value = len(tmp)
         tmp = chat_template(role_char.value,
                             text_format(role_chat_style.value,
                                         char=role_char.value,
                                         user=role_usr.value))
         setting_n_keep.value += len(tmp)
-        tmp = text_format(role_char_first.value,
-                          char=role_char.value,
-                          user=role_usr.value)
-        chatbot = [(None, chat_display_format(tmp))]
+        # ========== 加载角色卡-第一条消息 ==========
+        chatbot = []
+        for one in cfg["role_char_first"]:
+            one['name'] = text_format(one['name'],
+                                      char=role_char.value,
+                                      user=role_usr.value)
+            one['value'] = text_format(one['value'],
+                                       char=role_char.value,
+                                       user=role_usr.value)
+            if one['name'] == role_char.value:
+                chatbot.append((None, chat_display_format(one['value'])))
+            print(one)
     else:
         # ========== 加载角色卡-角色描述 ==========
         tmp = chat_template('system',
@@ -159,12 +166,19 @@ with gr.Blocks() as role:
         setting_n_keep.value = model.eval_t(tmp)  # 此内容永久存在
 
         # ========== 加载角色卡-第一条消息 ==========
-        tmp = text_format(role_char_first.value,
-                          char=role_char.value,
-                          user=role_usr.value)
-        chatbot = [(None, chat_display_format(tmp))]
-        tmp = chat_template(role_char.value, tmp)
-        model.eval_t(tmp)  # 此内容随上下文增加将被丢弃
+        chatbot = []
+        for one in cfg["role_char_first"]:
+            one['name'] = text_format(one['name'],
+                                      char=role_char.value,
+                                      user=role_usr.value)
+            one['value'] = text_format(one['value'],
+                                       char=role_char.value,
+                                       user=role_usr.value)
+            if one['name'] == role_char.value:
+                chatbot.append((None, chat_display_format(one['value'])))
+            print(one)
+            tmp = chat_template(one['name'], one['value'])
+            model.eval_t(tmp)  # 此内容随上下文增加将被丢弃
 
         # ========== 保存角色卡-缓存 ==========
         with open(setting_cache_path.value, 'wb') as f:
@@ -189,7 +203,7 @@ def btn_submit_com(_n_keep, _n_discard,
             tokens=t_bot,
             n_keep=_n_keep,
             n_discard=_n_discard,
-            im_start=chat_template(_role),  # 深拷贝
+            im_start=chat_template.im_start_token,
             top_k=_top_k,
             top_p=_top_p,
             min_p=_min_p,
@@ -220,7 +234,7 @@ def btn_submit_com(_n_keep, _n_discard,
     # ========== 移除末尾的换行符 ==========
     if model.str_detokenize(t_bot[-2:]) == '\n\n':
         print('completion_tokens', completion_tokens)
-        model.n_tokens -= 1
+        model.venv_pop_token()
     # ========== 给 kv_cache 加上输出结束符 ==========
     model.eval_t(chat_template.im_end_nl, _n_keep, _n_discard)
     t_bot.extend(chat_template.im_end_nl)
@@ -268,7 +282,9 @@ def btn_submit_bot(history, _n_keep, _n_discard,
     yield history, str((model.n_tokens, model.venv))
     # ========== 及时清理上一次生成的旁白 ==========
     if vo_idx > 0:
+        print('vo_idx', vo_idx, model.venv)
         model.venv_remove(vo_idx)
+        print('vo_idx', vo_idx, model.venv)
         if rag_idx and vo_idx < rag_idx:
             rag_idx -= 1
     # ========== 响应完毕后清除注入的内容 ==========
@@ -276,6 +292,7 @@ def btn_submit_bot(history, _n_keep, _n_discard,
         model.venv_remove(rag_idx)  # 销毁对应的 venv
     model.venv_disband()  # 退出隔离环境
     yield history, str((model.n_tokens, model.venv))
+    print('venv_disband', vo_idx, model.venv)
 
 
 # ========== 待实现 ==========

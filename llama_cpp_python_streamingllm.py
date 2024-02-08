@@ -36,12 +36,8 @@ class StreamingLLM(Llama):
     def str_detokenize(self, tokens) -> str:
         return get_complete_UTF8(self.detokenize(tokens))
 
-    def kv_cache_seq_trim(self, start_pos=-1):
-        if start_pos >= 0:
-            self._ctx.kv_cache_seq_rm(-1, start_pos, -1)
-            self.n_tokens = start_pos
-        else:
-            self._ctx.kv_cache_seq_rm(-1, self.n_tokens, -1)
+    def kv_cache_seq_trim(self):
+        self._ctx.kv_cache_seq_rm(-1, self.n_tokens, -1)
 
     def venv_create(self):
         self.venv.append(0)
@@ -50,7 +46,8 @@ class StreamingLLM(Llama):
     def venv_disband(self):
         if len(self.venv) <= 1:
             return 0
-        self.venv[-1] += self.venv.pop()
+        tmp = self.venv.pop()
+        self.venv[-1] += tmp
         return len(self.venv) - 1
 
     def venv_remove(self, venv_idx=None):
@@ -69,6 +66,11 @@ class StreamingLLM(Llama):
             self.kv_cache_seq_ltrim(n_keep, n_discard)
         return len(self.venv) - 1
 
+    def venv_pop_token(self):
+        self.n_tokens -= 1
+        self.venv[-1] -= 1
+        self.kv_cache_seq_trim()
+
     def kv_cache_seq_ltrim(self, n_keep, n_discard=256, n_past=-1, im_start=None):
         if n_past < 0:
             n_past = self.n_tokens
@@ -81,6 +83,7 @@ class StreamingLLM(Llama):
                 _idx = kmp_search(self.input_ids, im_start, n_keep, n_past, lps)
                 if _idx >= n_keep:
                     n_keep = _idx + len(im_start)  # 至少保留一个 im_start 序列结构
+            print('kv_cache_seq_ltrim', n_past, _idx, n_keep, n_discard, im_start, self.input_ids[_idx])
         self._ctx.kv_cache_seq_rm(-1, n_keep, n_keep + n_discard)
         self._ctx.kv_cache_seq_shift(0, n_keep + n_discard, n_past, -n_discard)
         self.input_ids[n_keep:n_past - n_discard] = self.input_ids[n_keep + n_discard:n_past]
@@ -89,7 +92,7 @@ class StreamingLLM(Llama):
     def eval_t(self, tokens, n_keep=4, n_discard=256, im_start=None):
         if self._n_ctx < self.n_tokens + len(tokens):
             tmp_n_discard = max(n_discard, self.n_tokens + len(tokens) - self._n_ctx)
-            self.kv_cache_seq_ltrim(n_keep, tmp_n_discard, im_start)
+            self.kv_cache_seq_ltrim(n_keep, tmp_n_discard, im_start=im_start)
         for i in range(0, len(tokens), self.n_batch):
             batch = tokens[i: i + self.n_batch]
             n_past = self.n_tokens
@@ -97,7 +100,11 @@ class StreamingLLM(Llama):
             self._batch.set_batch(
                 batch=batch, n_past=n_past, logits_all=self.context_params.logits_all
             )
-            self._ctx.decode(self._batch)
+            try:
+                self._ctx.decode(self._batch)
+            except RuntimeError as e:
+                print('eval_t miss kv_cache_seq_ltrim', n_keep, n_discard, im_start,  self.n_tokens, n_tokens, self.venv)
+                raise e
             # Save tokens
             self.input_ids[n_past: n_past + n_tokens] = batch
             # Save logits
@@ -235,7 +242,7 @@ class StreamingLLM(Llama):
         tfs_z = float(tfs_z)
         mirostat_tau = float(mirostat_tau)
         while True:
-            self.eval_t(tokens, n_keep, n_discard)
+            self.eval_t(tokens, n_keep, n_discard, im_start=im_start)
             token = self.sample_t(
                 top_k=top_k,
                 top_p=top_p,
@@ -275,8 +282,6 @@ class StreamingLLM(Llama):
         return retn
 
     def save_session(self, filepath: str):
-        # self.eval_t([0])  # https://github.com/ggerganov/llama.cpp/pull/4820
-        # self.n_tokens -= 1
         tokens = self._input_ids.tolist()
         tokens = (llama_cpp.llama_token * len(tokens))(*tokens)
         return llama_cpp.llama_save_session_file(self._ctx.ctx, filepath.encode('utf-8'), tokens, self.n_tokens)
