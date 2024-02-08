@@ -8,6 +8,7 @@ class ChatTemplate:
         self.model = model
         self.nl = nl
         self.im_start = im_start
+        self.im_start_token = model.tokenize(self.im_start.encode('utf-8'), add_bos=False, special=True)
         self.im_end = im_end
         self.im_end_nl = model.tokenize((self.im_end + self.nl).encode('utf-8'), add_bos=False, special=True)
 

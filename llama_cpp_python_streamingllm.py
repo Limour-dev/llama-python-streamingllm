@@ -83,7 +83,6 @@ class StreamingLLM(Llama):
                 _idx = kmp_search(self.input_ids, im_start, n_keep, n_past, lps)
                 if _idx >= n_keep:
                     n_keep = _idx + len(im_start)  # 至少保留一个 im_start 序列结构
-            print('kv_cache_seq_ltrim', n_past, _idx, n_keep, n_discard, im_start, self.input_ids[_idx])
         self._ctx.kv_cache_seq_rm(-1, n_keep, n_keep + n_discard)
         self._ctx.kv_cache_seq_shift(0, n_keep + n_discard, n_past, -n_discard)
         self.input_ids[n_keep:n_past - n_discard] = self.input_ids[n_keep + n_discard:n_past]
@@ -100,11 +99,7 @@ class StreamingLLM(Llama):
             self._batch.set_batch(
                 batch=batch, n_past=n_past, logits_all=self.context_params.logits_all
             )
-            try:
-                self._ctx.decode(self._batch)
-            except RuntimeError as e:
-                print('eval_t miss kv_cache_seq_ltrim', n_keep, n_discard, im_start,  self.n_tokens, n_tokens, self.venv)
-                raise e
+            self._ctx.decode(self._batch)
             # Save tokens
             self.input_ids[n_past: n_past + n_tokens] = batch
             # Save logits
