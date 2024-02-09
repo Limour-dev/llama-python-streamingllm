@@ -2,6 +2,7 @@ def init(cfg):
     chat_template = cfg['chat_template']
     model = cfg['model']
     gr = cfg['gr']
+    lock = cfg['session_lock']
 
     # ========== 流式输出函数 ==========
     def btn_com(_n_keep, _n_discard,
@@ -72,6 +73,10 @@ def init(cfg):
         tmp = gr.update(interactive=finish)
 
         def _inner():
+            with lock:
+                if cfg['session_active'] != finish:
+                    raise RuntimeError
+                cfg['session_active'] = not cfg['session_active']
             return tmp, tmp, tmp
 
         return _inner

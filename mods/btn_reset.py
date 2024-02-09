@@ -3,13 +3,15 @@ def init(cfg):
     model = cfg['model']
     s_info = cfg['s_info']
 
-    def btn_debug(_cache_path):
-        _tmp = model.load_session(_cache_path)
-        print(f'load cache from {_cache_path} {_tmp}')
-        return model.venv_info
+    def btn_reset(_cache_path):
+        with cfg['session_lock']:
+            _tmp = model.load_session(_cache_path)
+            print(f'load cache from {_cache_path} {_tmp}')
+            cfg['session_active'] = False
+            return model.venv_info
 
     cfg['btn_reset'].click(
-        fn=btn_debug,
+        fn=btn_reset,
         inputs=cfg['setting_cache_path'],
         outputs=s_info
     ).success(
@@ -18,5 +20,5 @@ def init(cfg):
 
     cfg['btn_debug'].click(
         fn=lambda: model.str_detokenize(model._input_ids),
-        outputs=cfg['rag']
+        outputs=cfg['vo']
     )

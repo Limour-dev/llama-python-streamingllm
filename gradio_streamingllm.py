@@ -1,5 +1,5 @@
 import gradio as gr
-
+import threading
 from llama_cpp_python_streamingllm import StreamingLLM
 from mods.read_cfg import cfg
 
@@ -24,6 +24,10 @@ from mods.btn_reset import init as btn_reset_init
 
 # ========== 聊天的模版 默认 chatml ==========
 from chat_template import ChatTemplate
+
+#  ========== 全局锁，确保只能进行一个会话 ==========
+cfg['session_lock'] = threading.Lock()
+cfg['session_active'] = False
 
 #  ========== 温度、采样之类的设置 ==========
 with gr.Blocks() as setting:
