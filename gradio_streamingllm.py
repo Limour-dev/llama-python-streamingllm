@@ -271,12 +271,17 @@ def btn_submit_bot(history, _n_keep, _n_discard,
         model.venv_create('rag')  # 记录 venv_idx
         t_rag = chat_template('system', _rag)
         model.eval_t(t_rag, _n_keep, _n_discard)
-    model.venv_create('bot')  # 与 t_rag 隔离
+    # ========== 释放不再需要的环境 ==========
+    model.venv_disband({'usr', 'char'})
+    print('venv_disband char', model.venv_info)
     # ========== 用户输入 ==========
+    model.venv_create('usr')
     t_msg = history[-1][0]
     t_msg = chat_template(_usr, t_msg)
     model.eval_t(t_msg, _n_keep, _n_discard)
+    yield history, model.venv_info
     # ========== 模型输出 ==========
+    model.venv_create('char')
     _tmp = btn_submit_com(_n_keep, _n_discard,
                           _temperature, _repeat_penalty, _frequency_penalty,
                           _presence_penalty, _repeat_last_n, _top_k,
@@ -289,14 +294,9 @@ def btn_submit_bot(history, _n_keep, _n_discard,
     # ========== 输出完毕后格式化输出 ==========
     history[-1][1] = chat_display_format(history[-1][1])
     yield history, model.venv_info
-    # ========== 及时清理上一次生成的旁白 ==========
-    model.venv_remove('vo')
-    print('清理旁白', model.venv_info)
     # ========== 响应完毕后清除注入的内容 ==========
     model.venv_remove('rag')  # 销毁对应的 venv
-    model.venv_disband('bot')  # 退出隔离环境
     yield history, model.venv_info
-    print('venv_disband bot', model.venv_info)
 
 
 # ========== 待实现 ==========
@@ -312,8 +312,11 @@ def btn_submit_vo(_n_keep, _n_discard,
                   _top_p, _min_p, _typical_p,
                   _tfs_z, _mirostat_mode, _mirostat_eta,
                   _mirostat_tau, _max_tokens):
-    model.venv_create('vo')  # 创建隔离环境
+    # ========== 及时清理上一次生成的旁白 ==========
+    model.venv_remove('vo')
+    print('清理旁白', model.venv_info)
     # ========== 模型输出旁白 ==========
+    model.venv_create('vo')  # 创建隔离环境
     _tmp = btn_submit_com(_n_keep, _n_discard,
                           _temperature, _repeat_penalty, _frequency_penalty,
                           _presence_penalty, _repeat_last_n, _top_k,
@@ -324,15 +327,15 @@ def btn_submit_vo(_n_keep, _n_discard,
         yield _h, model.venv_info
 
 
-# ========== 给用户提供默认回复 ==========
+# ========== 给用户提供默认回复的建议 ==========
 def btn_submit_suggest(_n_keep, _n_discard,
                        _temperature, _repeat_penalty, _frequency_penalty,
                        _presence_penalty, _repeat_last_n, _top_k,
                        _top_p, _min_p, _typical_p,
                        _tfs_z, _mirostat_mode, _mirostat_eta,
                        _mirostat_tau, _usr, _max_tokens):
+    # ========== 模型输出建议 ==========
     model.venv_create('suggest')  # 创建隔离环境
-    # ========== 模型输出 ==========
     _tmp = btn_submit_com(_n_keep, _n_discard,
                           _temperature, _repeat_penalty, _frequency_penalty,
                           _presence_penalty, _repeat_last_n, _top_k,
