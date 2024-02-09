@@ -267,12 +267,11 @@ def btn_submit_bot(history, _n_keep, _n_discard,
                    _mirostat_tau, _usr, _char,
                    _rag, _max_tokens):
     # ========== 需要临时注入的内容 ==========
-    rag_idx = None
     if len(_rag) > 0:
-        rag_idx = model.venv_create()  # 记录 venv_idx
+        model.venv_create('rag')  # 记录 venv_idx
         t_rag = chat_template('system', _rag)
         model.eval_t(t_rag, _n_keep, _n_discard)
-    model.venv_create()  # 与 t_rag 隔离
+    model.venv_create('bot')  # 与 t_rag 隔离
     # ========== 用户输入 ==========
     t_msg = history[-1][0]
     t_msg = chat_template(_usr, t_msg)
@@ -286,32 +285,24 @@ def btn_submit_bot(history, _n_keep, _n_discard,
                           _mirostat_tau, _char, _max_tokens)
     for _h in _tmp:
         history[-1][1] = _h
-        yield history, str((model.n_tokens, model.venv))
+        yield history, model.venv_info
     # ========== 输出完毕后格式化输出 ==========
     history[-1][1] = chat_display_format(history[-1][1])
-    yield history, str((model.n_tokens, model.venv))
+    yield history, model.venv_info
     # ========== 及时清理上一次生成的旁白 ==========
-    if vo_idx > 0:
-        print('vo_idx', vo_idx, model.venv)
-        model.venv_remove(vo_idx)
-        print('vo_idx', vo_idx, model.venv)
-        if rag_idx and vo_idx < rag_idx:
-            rag_idx -= 1
+    model.venv_remove('vo')
+    print('清理旁白', model.venv_info)
     # ========== 响应完毕后清除注入的内容 ==========
-    if rag_idx is not None:
-        model.venv_remove(rag_idx)  # 销毁对应的 venv
-    model.venv_disband()  # 退出隔离环境
-    yield history, str((model.n_tokens, model.venv))
-    print('venv_disband', vo_idx, model.venv)
+    model.venv_remove('rag')  # 销毁对应的 venv
+    model.venv_disband('bot')  # 退出隔离环境
+    yield history, model.venv_info
+    print('venv_disband bot', model.venv_info)
 
 
 # ========== 待实现 ==========
 def btn_rag_(_rag, _msg):
     retn = ''
     return retn
-
-
-vo_idx = 0
 
 
 # ========== 输出一段旁白 ==========
@@ -321,8 +312,7 @@ def btn_submit_vo(_n_keep, _n_discard,
                   _top_p, _min_p, _typical_p,
                   _tfs_z, _mirostat_mode, _mirostat_eta,
                   _mirostat_tau, _max_tokens):
-    global vo_idx
-    vo_idx = model.venv_create()  # 创建隔离环境
+    model.venv_create('vo')  # 创建隔离环境
     # ========== 模型输出旁白 ==========
     _tmp = btn_submit_com(_n_keep, _n_discard,
                           _temperature, _repeat_penalty, _frequency_penalty,
@@ -331,7 +321,7 @@ def btn_submit_vo(_n_keep, _n_discard,
                           _tfs_z, _mirostat_mode, _mirostat_eta,
                           _mirostat_tau, '旁白', _max_tokens)
     for _h in _tmp:
-        yield _h, str((model.n_tokens, model.venv))
+        yield _h, model.venv_info
 
 
 # ========== 给用户提供默认回复 ==========
@@ -341,7 +331,7 @@ def btn_submit_suggest(_n_keep, _n_discard,
                        _top_p, _min_p, _typical_p,
                        _tfs_z, _mirostat_mode, _mirostat_eta,
                        _mirostat_tau, _usr, _max_tokens):
-    model.venv_create()  # 创建隔离环境
+    model.venv_create('suggest')  # 创建隔离环境
     # ========== 模型输出 ==========
     _tmp = btn_submit_com(_n_keep, _n_discard,
                           _temperature, _repeat_penalty, _frequency_penalty,
@@ -351,9 +341,9 @@ def btn_submit_suggest(_n_keep, _n_discard,
                           _mirostat_tau, _usr, _max_tokens)
     _h = ''
     for _h in _tmp:
-        yield _h, str((model.n_tokens, model.venv))
-    model.venv_remove()  # 销毁隔离环境
-    yield _h, str((model.n_tokens, model.venv))
+        yield _h, model.venv_info
+    model.venv_remove('suggest')  # 销毁隔离环境
+    yield _h,  model.venv_info
 
 
 # ========== 聊天页面 ==========
@@ -364,7 +354,7 @@ with gr.Blocks() as chatting:
         with gr.Column(scale=1, elem_id="area"):
             rag = gr.Textbox(label='RAG', show_copy_button=True, elem_id="RAG-area")
             vo = gr.Textbox(label='VO', show_copy_button=True, elem_id="VO-area")
-            s_info = gr.Textbox(value=str((model.n_tokens, model.venv)), max_lines=1, label='info', interactive=False)
+            s_info = gr.Textbox(value=model.venv_info, max_lines=1, label='info', interactive=False)
     msg = gr.Textbox(label='Prompt', lines=2, max_lines=2, elem_id='prompt', autofocus=True, **cfg['msg'])
     with gr.Row():
         btn_rag = gr.Button("RAG")
@@ -423,10 +413,7 @@ with gr.Blocks() as chatting:
     def btn_com2(_cache_path):
         _tmp = model.load_session(setting_cache_path.value)
         print(f'load cache from {setting_cache_path.value} {_tmp}')
-        global vo_idx
-        vo_idx = 0
-        model.venv = [0]
-        return str((model.n_tokens, model.venv))
+        return model.venv_info
 
     # ========== 开始运行 ==========
 demo = gr.TabbedInterface([chatting, setting, role],

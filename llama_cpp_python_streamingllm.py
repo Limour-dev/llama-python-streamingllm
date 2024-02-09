@@ -32,6 +32,7 @@ class StreamingLLM(Llama):
     def __init__(self, model_path: str, **kwargs):
         super().__init__(model_path, **kwargs)
         self.venv = [0]
+        self.venv_idx_map = {}
 
     def str_detokenize(self, tokens) -> str:
         return get_complete_UTF8(self.detokenize(tokens))
@@ -39,37 +40,57 @@ class StreamingLLM(Llama):
     def kv_cache_seq_trim(self):
         self._ctx.kv_cache_seq_rm(-1, self.n_tokens, -1)
 
-    def venv_create(self):
+    def venv_create(self, name: str):
+        if name in self.venv_idx_map:
+            return name
         self.venv.append(0)
-        return len(self.venv) - 1
+        self.venv_idx_map[name] = len(self.venv) - 1
+        return name
 
-    def venv_disband(self):
+    def venv_disband(self, name: str):
         if len(self.venv) <= 1:
-            return 0
-        tmp = self.venv.pop()
-        self.venv[-1] += tmp
-        return len(self.venv) - 1
+            return name
+        if name not in self.venv_idx_map:
+            return name
+        venv_idx = self.venv_idx_map.pop(name)
+        if venv_idx != len(self.venv) - 1:
+            # 非最后一层
+            for k, v in self.venv_idx_map.items():
+                if v > venv_idx:
+                    self.venv_idx_map[k] = v - 1
+        tmp = self.venv.pop(venv_idx)
+        self.venv[venv_idx - 1] += tmp
+        return name
 
-    def venv_remove(self, venv_idx=None):
-        if venv_idx is None:
-            venv_idx = len(self.venv) - 1
-        if venv_idx <= 0 or venv_idx >= len(self.venv):
-            return len(self.venv) - 1
+    def venv_remove(self, name: str):
+        if len(self.venv) <= 1:
+            return name
+        if name not in self.venv_idx_map:
+            return name
+        venv_idx = self.venv_idx_map.pop(name)
         if venv_idx == len(self.venv) - 1:
             # 最后一层
             self.n_tokens -= min(self.venv.pop(), self.n_tokens)
             self.kv_cache_seq_trim()
         else:
             # 非最后一层
+            for k, v in self.venv_idx_map.items():
+                if v > venv_idx:
+                    self.venv_idx_map[k] = v - 1
             n_keep = self.n_tokens - sum(self.venv[i] for i in range(venv_idx, len(self.venv)))
             n_discard = self.venv.pop(venv_idx)
             self.kv_cache_seq_ltrim(n_keep, n_discard)
-        return len(self.venv) - 1
+
+        return name
 
     def venv_pop_token(self):
         self.n_tokens -= 1
         self.venv[-1] -= 1
         self.kv_cache_seq_trim()
+
+    @property
+    def venv_info(self):
+        return str((self.n_tokens, self.venv, self.venv_idx_map))
 
     def kv_cache_seq_ltrim(self, n_keep, n_discard=256, n_past=-1, im_start=None):
         if n_past < 0:
@@ -274,6 +295,8 @@ class StreamingLLM(Llama):
                                                  n_tokens)
         self.n_tokens = n_tokens.contents.value
         self.input_ids[:self.n_tokens] = tokens[:self.n_tokens]
+        self.venv = [0]
+        self.venv_idx_map = {}
         return retn
 
     def save_session(self, filepath: str):
