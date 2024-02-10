@@ -47,29 +47,35 @@ def init(cfg):
                 mirostat_tau=_mirostat_tau,
                 mirostat_eta=_mirostat_eta,
         ):
+            # ========== eos or nlnl 说明eos了 ==========
             if token in chat_template.eos or token == chat_template.nlnl:
                 t_bot.extend(completion_tokens)
                 print('token in eos', token)
                 break
+            # ========== 避免不完整的utf-8编码 ==========
             completion_tokens.append(token)
             all_text = model.str_detokenize(completion_tokens)
             if not all_text:
                 continue
             t_bot.extend(completion_tokens)
+            # ========== 流式输出 ==========
             history += all_text
             yield history
-            if token in chat_template.onenl:
-                # ========== 移除末尾的换行符 ==========
-                if t_bot[-2] in chat_template.onenl:
-                    model.venv_pop_token()
-                    break
-                if t_bot[-2] in chat_template.onerl and t_bot[-3] in chat_template.onenl:
-                    model.venv_pop_token()
-                    break
-            if history[-2:] == '\n\n':  # 各种 'x\n\n' 的token，比如'。\n\n'
-                print('t_bot[-4:]', t_bot[-4:], repr(model.str_detokenize(t_bot[-4:])),
-                      repr(model.str_detokenize(t_bot[-1:])))
+            # ========== \n role \n 结构说明eos了 ==========
+            tmp = chat_template.eos_in_role(history, t_bot)
+            if tmp:
+                tmp -= 1  # 最后一个token并未进入kv_cache
+                if tmp:
+                    model.venv_pop_token(tmp)
                 break
+            # ========== \n\n 结构说明eos了 ==========
+            tmp = chat_template.eos_in_nlnl(history, t_bot)
+            if tmp:
+                tmp -= 1  # 最后一个token并未进入kv_cache
+                if tmp:
+                    model.venv_pop_token(tmp)
+                break
+            # ========== 过长 or 按下了stop按钮 ==========
             if len(t_bot) > _max_tokens or cfg['btn_stop_status']:
                 break
             completion_tokens = []
