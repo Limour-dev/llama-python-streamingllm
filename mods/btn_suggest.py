@@ -35,7 +35,8 @@ def init(cfg):
     ).success(
         fn=btn_suggest,
         inputs=cfg['setting'],
-        outputs=[cfg['msg'], s_info]
+        outputs=[cfg['msg'], s_info],
+        **cfg['btn_concurrency']
     ).success(
         **cfg['btn_finish']
     )

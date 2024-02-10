@@ -66,11 +66,13 @@ def init(cfg):
     ).success(
         fn=btn_submit_usr, api_name="submit",
         inputs=[msg, chatbot],
-        outputs=[msg, chatbot]
+        outputs=[msg, chatbot],
+        **cfg['btn_concurrency']
     ).success(
         fn=btn_submit_bot,
         inputs=[chatbot]+cfg['setting'],
-        outputs=[chatbot, s_info]
+        outputs=[chatbot, s_info],
+        **cfg['btn_concurrency']
     ).success(
         **cfg['btn_finish']
     )

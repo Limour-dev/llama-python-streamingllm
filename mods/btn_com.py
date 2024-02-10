@@ -4,6 +4,18 @@ def init(cfg):
     gr = cfg['gr']
     lock = cfg['session_lock']
 
+    with gr.Row():
+        cfg['btn_vo'] = gr.Button("旁白")
+        cfg['btn_rag'] = gr.Button("RAG")
+        cfg['btn_retry'] = gr.Button("Retry")
+        cfg['btn_stop'] = gr.Button("Stop")
+        cfg['btn_reset'] = gr.Button("Reset")
+        cfg['btn_debug'] = gr.Button("Debug")
+        cfg['btn_submit'] = gr.Button("Submit")
+        cfg['btn_suggest'] = gr.Button("建议")
+
+    cfg['btn_stop_status'] = True
+
     # ========== 流式输出函数 ==========
     def btn_com(_n_keep, _n_discard,
                 _temperature, _repeat_penalty, _frequency_penalty,
@@ -58,7 +70,7 @@ def init(cfg):
                 print('t_bot[-4:]', t_bot[-4:], repr(model.str_detokenize(t_bot[-4:])),
                       repr(model.str_detokenize(t_bot[-1:])))
                 break
-            if len(t_bot) > _max_tokens:
+            if len(t_bot) > _max_tokens or cfg['btn_stop_status']:
                 break
             completion_tokens = []
         # ========== 查看末尾的换行符 ==========
@@ -75,14 +87,21 @@ def init(cfg):
         def _inner():
             with lock:
                 if cfg['session_active'] != finish:
-                    raise RuntimeError
+                    raise RuntimeError('任务中断！请稍等或Reset，如已Reset，请忽略。')
                 cfg['session_active'] = not cfg['session_active']
-            return tmp, tmp, tmp, tmp
+                cfg['btn_stop_status'] = finish
+                return tmp, tmp, tmp, tmp
 
         return _inner
 
     btn_start_or_finish_outputs = [cfg['btn_submit'], cfg['btn_vo'],
                                    cfg['btn_suggest'], cfg['btn_retry']]
+
+    cfg['btn_concurrency'] = {
+        'trigger_mode': 'once',
+        'concurrency_id': 'btn_com',
+        'concurrency_limit': 1
+    }
 
     cfg['btn_start'] = {
         'fn': btn_start_or_finish(False),
@@ -93,6 +112,9 @@ def init(cfg):
         'fn': btn_start_or_finish(True),
         'outputs': btn_start_or_finish_outputs
     }
+
+    cfg['btn_start'].update(cfg['btn_concurrency'])
+    cfg['btn_finish'].update(cfg['btn_concurrency'])
 
     cfg['setting'] = [cfg[x] for x in ('setting_n_keep', 'setting_n_discard',
                                        'setting_temperature', 'setting_repeat_penalty', 'setting_frequency_penalty',

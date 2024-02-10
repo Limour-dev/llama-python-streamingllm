@@ -35,7 +35,8 @@ def init(cfg):
     ).success(
         fn=btn_vo,
         inputs=cfg['setting'],
-        outputs=[cfg['vo'], s_info]
+        outputs=[cfg['vo'], s_info],
+        **cfg['btn_concurrency']
     ).success(
         **cfg['btn_finish']
     )
