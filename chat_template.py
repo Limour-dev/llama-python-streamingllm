@@ -3,6 +3,7 @@ import copy
 
 class ChatTemplate:
     cache = {}
+    roles = set()
 
     def __init__(self, model, im_start=r'<|im_start|>', im_end=r'<|im_end|>', nl='\n'):
         self.model = model
@@ -31,7 +32,42 @@ class ChatTemplate:
             self.cache[key] = copy.deepcopy(value)  # 深拷贝一下
             return value
 
+    def _add_role(self, _role):
+        if _role:
+            self.roles.add('\n' + _role)
+
+    def eos_in_role(self, history: str, t_bot):
+        if not (history.endswith('\n') or history.endswith('\r')):
+            return 0
+        tmp = history.rstrip()
+        for _role in self.roles:
+            if tmp.endswith(_role):
+                n = len(t_bot)
+                for i in range(1, n):  # 找出需要弃置的tokens长度
+                    tmp = self.model.str_detokenize(t_bot[n - i:])
+                    if tmp.rstrip().endswith(_role):
+                        print('eos_in_role', t_bot[n - i:], repr(tmp))
+                        return i
+                print('eos_in_role missing')
+                break
+        return 0
+
+    def eos_in_nlnl(self, history: str, t_bot):
+        if not (history.endswith('\n\n') or history.endswith('\n\r\n')):
+            return 0
+        n = len(t_bot)
+        for i in range(1, n):  # 找出需要弃置的tokens长度
+            tmp = self.model.str_detokenize(t_bot[n - i:])
+            if tmp.endswith('\n\n') or tmp.endswith('\n\r\n'):
+                if tmp.startswith(']'):  # 避免误判
+                    return 0
+                print('eos_in_nlnl', t_bot[n - i:], repr(tmp))
+                return i
+        print('eos_in_nlnl missing')
+        return 0
+
     def __call__(self, _role, prompt=None):
+        self._add_role(_role)
         if prompt is None:
             return self._get(_role)
         # print(_role, prompt, self.cache)

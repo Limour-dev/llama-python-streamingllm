@@ -6,35 +6,13 @@ from ctypes import POINTER
 from KMP_list import kmp_search, compute_lps_array
 
 
-def is_UTF8_incomplete(all_text):
-    multibyte_fix = 0
-    if len(all_text) < 3:
-        all_text = b'000' + all_text
-    for k, char in enumerate(all_text[-3:]):
-        k = 3 - k
-        for num, pattern in [(2, 192), (3, 224), (4, 240)]:
-            # Bitwise AND check
-            if num > k and pattern & char == pattern:
-                multibyte_fix = num - k
-    return multibyte_fix
-
-
-def get_complete_UTF8(all_text):
-    multibyte_fix = is_UTF8_incomplete(all_text)
-    if multibyte_fix > 0:
-        multibyte_fix = multibyte_fix - 3
-        return all_text[:multibyte_fix].decode("utf-8")
-    else:
-        return all_text.decode("utf-8")
-
-
 class StreamingLLM(Llama):
     def __init__(self, model_path: str, **kwargs):
         super().__init__(model_path, **kwargs)
         self._venv_init()
 
     def str_detokenize(self, tokens) -> str:
-        return get_complete_UTF8(self.detokenize(tokens))
+        return self.detokenize(tokens).decode('utf-8', errors='ignore')
 
     def kv_cache_seq_trim(self):
         self._ctx.kv_cache_seq_rm(-1, self.n_tokens, -1)
@@ -103,9 +81,9 @@ class StreamingLLM(Llama):
                     break
         return True
 
-    def venv_pop_token(self):
-        self.n_tokens -= 1
-        self.venv[-1] -= 1
+    def venv_pop_token(self, n=1):
+        self.n_tokens -= n
+        self.venv[-1] -= n
         self.kv_cache_seq_trim()
 
     @property
@@ -113,6 +91,8 @@ class StreamingLLM(Llama):
         return str((self.n_tokens, self.venv, self.venv_idx_map))
 
     def kv_cache_seq_ltrim(self, n_keep, n_discard=256, n_past=-1, im_start=None):
+        if n_keep < 0:
+            return
         if n_past < 0:
             n_past = self.n_tokens
         if im_start is not None:  # [<|im_start|>, name, nl]
