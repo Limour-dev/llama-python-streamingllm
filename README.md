@@ -18,6 +18,6 @@ python .\gradio_streamingllm.py
 
 ## Huggingface Spaces
 + [Limour](https://huggingface.co/Limour)/[llama-python-streamingllm](https://huggingface.co/spaces/Limour/llama-python-streamingllm)
-+ 仅支持同时一个人用，用之前点 `自定义2` 按钮恢复初始的 kv_cache
++ 仅支持同时一个人用，用之前点 `Reset` 按钮恢复初始的 kv_cache，按 `Submit` 没反应，说明有人在用，等一段时间后再 `Reset`
 + 多于一个窗口使用会崩溃，需要到设置里 `Restart this Space` 才能恢复
 + 只能 Duplicate 后，设为私密来使用
