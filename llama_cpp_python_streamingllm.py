@@ -50,10 +50,10 @@ class StreamingLLM(Llama):
 
     def venv_disband(self, name_set):
         if len(self.venv) <= 1:
-            return name_set
+            return False
         name_set = {x for x in name_set if x in self.venv_idx_map}
         if not name_set:
-            return name_set
+            return False
         while self.venv_idx_map:
             if self.venv_idx_map[0] in name_set:
                 self.venv_idx_map.pop(0)  # 删除
@@ -61,13 +61,29 @@ class StreamingLLM(Llama):
                 self.venv[0] += tmp
             else:
                 break
-        return name_set
+        return True
+
+    def venv_revision(self, name: str):
+        if len(self.venv) <= 1:
+            return False
+        if name not in self.venv_idx_map:
+            return False
+        _s = 0
+        while self.venv_idx_map:
+            if self.venv_idx_map[-1] == name:
+                break
+            self.venv_idx_map.pop()  # 删除
+            _s += self.venv.pop()
+        if _s:
+            self.n_tokens -= min(_s, self.n_tokens)
+            self.kv_cache_seq_trim()
+        return True
 
     def venv_remove(self, name: str):
         if len(self.venv) <= 1:
-            return name
+            return False
         if name not in self.venv_idx_map:
-            return name
+            return False
         venv_idx = self.venv_idx_map.index(name) + 1
         while self.venv_idx_map:
             self.venv_idx_map.pop(venv_idx - 1)  # 删除
@@ -85,7 +101,7 @@ class StreamingLLM(Llama):
                     venv_idx = self.venv_idx_map.index(name, venv_idx - 1) + 1
                 except ValueError:  # 没有了
                     break
-        return name
+        return True
 
     def venv_pop_token(self):
         self.n_tokens -= 1

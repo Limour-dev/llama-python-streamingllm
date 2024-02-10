@@ -10,11 +10,14 @@ from mods.btn_rag import init as btn_rag_init
 # ========== 按钮中用到的共同的函数 ==========
 from mods.btn_com import init as btn_com_init
 
-# ========== 输出一段旁白 ==========
+# ========== 输出一段回答 ==========
 from mods.btn_submit import init as btn_submit_init
 
 # ========== 输出一段旁白 ==========
 from mods.btn_vo import init as btn_vo_init
+
+# ========== 重新输出一段回答 ==========
+from mods.btn_retry import init as btn_retry_init
 
 # ========== 给用户提供默认回复的建议 ==========
 from mods.btn_suggest import init as btn_suggest_init
@@ -116,6 +119,8 @@ with gr.Blocks() as chatting:
     btn_vo_init(cfg)
 
     btn_suggest_init(cfg)
+
+    btn_retry_init(cfg)
 
     # ========== 用于调试 ==========
     btn_reset_init(cfg)
