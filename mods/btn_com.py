@@ -77,11 +77,12 @@ def init(cfg):
                 if cfg['session_active'] != finish:
                     raise RuntimeError
                 cfg['session_active'] = not cfg['session_active']
-            return tmp, tmp, tmp
+            return tmp, tmp, tmp, tmp
 
         return _inner
 
-    btn_start_or_finish_outputs = [cfg['btn_submit'], cfg['btn_vo'], cfg['btn_suggest']]
+    btn_start_or_finish_outputs = [cfg['btn_submit'], cfg['btn_vo'],
+                                   cfg['btn_suggest'], cfg['btn_retry']]
 
     cfg['btn_start'] = {
         'fn': btn_start_or_finish(False),
