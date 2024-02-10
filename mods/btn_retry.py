@@ -22,7 +22,8 @@ def init(cfg):
                 raise RuntimeError
             # ========== 回滚到上一次用户输入 ==========
             if not model.venv_revision('usr'):
-                return history, model.venv_info
+                yield history, model.venv_info
+                return
             # ========== 需要临时注入的内容 ==========
             if len(_rag) > 0:
                 model.venv_create('rag')  # 记录 venv_idx
