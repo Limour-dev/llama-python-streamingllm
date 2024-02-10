@@ -28,6 +28,9 @@ from mods.btn_reset import init as btn_reset_init
 # ========== 聊天的模版 默认 chatml ==========
 from chat_template import ChatTemplate
 
+# ========== 加载角色卡-缓存 ==========
+from mods.load_cache import init as load_cache_init
+
 #  ========== 全局锁，确保只能进行一个会话 ==========
 cfg['session_lock'] = threading.Lock()
 cfg['session_active'] = False
@@ -84,8 +87,6 @@ with gr.Blocks() as role:
     cfg['role_chat_style'] = gr.Textbox(lines=10, label="回复示例", **cfg['role_chat_style'])
 
     # ========== 加载角色卡-缓存 ==========
-    from mods.load_cache import init as load_cache_init
-
     text_display_init(cfg)
     load_cache_init(cfg)
 
@@ -99,15 +100,6 @@ with gr.Blocks() as chatting:
             cfg['vo'] = gr.Textbox(label='VO', show_copy_button=True, elem_id="VO-area")
             cfg['s_info'] = gr.Textbox(value=cfg['model'].venv_info, max_lines=1, label='info', interactive=False)
     cfg['msg'] = gr.Textbox(label='Prompt', lines=2, max_lines=2, elem_id='prompt', autofocus=True, **cfg['msg'])
-    with gr.Row():
-        cfg['btn_vo'] = gr.Button("旁白")
-        cfg['btn_rag'] = gr.Button("RAG")
-        cfg['btn_retry'] = gr.Button("Retry")
-        cfg['btn_com1'] = gr.Button("自定义1")
-        cfg['btn_reset'] = gr.Button("Reset")
-        cfg['btn_debug'] = gr.Button("Debug")
-        cfg['btn_submit'] = gr.Button("Submit")
-        cfg['btn_suggest'] = gr.Button("建议")
 
     cfg['gr'] = gr
     btn_com_init(cfg)
@@ -164,4 +156,4 @@ demo = gr.TabbedInterface([chatting, setting, role],
                           ["聊天", "设置", '角色'],
                           css=custom_css)
 gr.close_all()
-demo.queue(api_open=False, max_size=1).launch(share=False)
+demo.queue(api_open=False, max_size=1).launch(share=False, show_error=True, show_api=False)
