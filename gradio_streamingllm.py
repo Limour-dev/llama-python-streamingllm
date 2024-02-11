@@ -22,6 +22,9 @@ from mods.btn_retry import init as btn_retry_init
 # ========== 给用户提供默认回复的建议 ==========
 from mods.btn_suggest import init as btn_suggest_init
 
+# ========== 融合功能的按钮 ==========
+from mods.btn_submit_vo_suggest import init as btn_submit_vo_suggest_init
+
 # ========== 重置按钮 ==========
 from mods.btn_reset import init as btn_reset_init
 
@@ -113,6 +116,8 @@ with gr.Blocks() as chatting:
     btn_suggest_init(cfg)
 
     btn_retry_init(cfg)
+
+    btn_submit_vo_suggest_init(cfg)
 
     # ========== 用于调试 ==========
     btn_reset_init(cfg)
