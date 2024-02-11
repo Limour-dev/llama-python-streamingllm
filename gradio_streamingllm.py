@@ -45,13 +45,13 @@ with gr.Blocks() as setting:
         cfg['setting_cache_path'] = gr.Textbox(label="缓存路径", max_lines=1, scale=2, **cfg['setting_cache_path'])
         cfg['setting_seed'] = gr.Number(label="随机种子", scale=1, **cfg['setting_seed'])
         cfg['setting_n_gpu_layers'] = gr.Number(label="n_gpu_layers", scale=1, **cfg['setting_n_gpu_layers'])
-    with gr.Row():
+    with gr.Row(elem_classes='setting'):
         cfg['setting_ctx'] = gr.Number(label="上下文大小（Tokens）", **cfg['setting_ctx'])
         cfg['setting_max_tokens'] = gr.Number(label="最大响应长度（Tokens）", interactive=True,
                                               **cfg['setting_max_tokens'])
         cfg['setting_n_keep'] = gr.Number(value=10, label="n_keep", interactive=False)
         cfg['setting_n_discard'] = gr.Number(label="n_discard", interactive=True, **cfg['setting_n_discard'])
-    with gr.Row():
+    with gr.Row(elem_classes='setting'):
         cfg['setting_temperature'] = gr.Number(label="温度", interactive=True, **cfg['setting_temperature'])
         cfg['setting_repeat_penalty'] = gr.Number(label="重复惩罚", interactive=True, **cfg['setting_repeat_penalty'])
         cfg['setting_frequency_penalty'] = gr.Number(label="频率惩罚", interactive=True,
@@ -59,13 +59,13 @@ with gr.Blocks() as setting:
         cfg['setting_presence_penalty'] = gr.Number(label="存在惩罚", interactive=True,
                                                     **cfg['setting_presence_penalty'])
         cfg['setting_repeat_last_n'] = gr.Number(label="惩罚范围", interactive=True, **cfg['setting_repeat_last_n'])
-    with gr.Row():
+    with gr.Row(elem_classes='setting'):
         cfg['setting_top_k'] = gr.Number(label="Top-K", interactive=True, **cfg['setting_top_k'])
         cfg['setting_top_p'] = gr.Number(label="Top P", interactive=True, **cfg['setting_top_p'])
         cfg['setting_min_p'] = gr.Number(label="Min P", interactive=True, **cfg['setting_min_p'])
         cfg['setting_typical_p'] = gr.Number(label="Typical", interactive=True, **cfg['setting_typical_p'])
         cfg['setting_tfs_z'] = gr.Number(label="TFS", interactive=True, **cfg['setting_tfs_z'])
-    with gr.Row():
+    with gr.Row(elem_classes='setting'):
         cfg['setting_mirostat_mode'] = gr.Number(label="Mirostat 模式", **cfg['setting_mirostat_mode'])
         cfg['setting_mirostat_eta'] = gr.Number(label="Mirostat 学习率", interactive=True,
                                                 **cfg['setting_mirostat_eta'])
@@ -153,6 +153,14 @@ custom_css = r'''
 }
 #prompt > label > textarea {
     max-height: 63px;
+}
+.setting label {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.setting input {
+    margin-top: auto;
 }
 '''
 
