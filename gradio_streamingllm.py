@@ -99,7 +99,7 @@ with gr.Blocks() as chatting:
         cfg['chatbot'] = gr.Chatbot(height='60vh', scale=2, value=cfg['chatbot'],
                                     avatar_images=(r'assets/user.png', r'assets/chatbot.webp'))
         with gr.Column(scale=1, elem_id="area"):
-            cfg['rag'] = gr.Textbox(label='RAG', show_copy_button=True, elem_id="RAG-area")
+            cfg['rag'] = gr.Textbox(label='RAG', lines=2, show_copy_button=True, elem_id="RAG-area")
             cfg['vo'] = gr.Textbox(label='VO', show_copy_button=True, elem_id="VO-area")
             cfg['s_info'] = gr.Textbox(value=cfg['model'].venv_info, max_lines=1, label='info', interactive=False)
     cfg['msg'] = gr.Textbox(label='Prompt', lines=2, max_lines=2, elem_id='prompt', autofocus=True, **cfg['msg'])
