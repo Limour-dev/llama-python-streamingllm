@@ -30,13 +30,17 @@ def init(cfg):
             model.venv_remove('suggest')  # 销毁隔离环境
             yield _h, model.venv_info
 
+    cfg['btn_suggest_fn'] = {
+        'fn': btn_suggest,
+        'inputs': cfg['setting'],
+        'outputs': [cfg['msg'], s_info]
+    }
+    cfg['btn_suggest_fn'].update(cfg['btn_concurrency'])
+
     cfg['btn_suggest'].click(
         **cfg['btn_start']
     ).success(
-        fn=btn_suggest,
-        inputs=cfg['setting'],
-        outputs=[cfg['msg'], s_info],
-        **cfg['btn_concurrency']
+        **cfg['btn_suggest_fn']
     ).success(
         **cfg['btn_finish']
     )

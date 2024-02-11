@@ -11,6 +11,7 @@ def init(cfg):
         cfg['btn_stop'] = gr.Button("Stop")
         cfg['btn_reset'] = gr.Button("Reset")
         cfg['btn_debug'] = gr.Button("Debug")
+        cfg['btn_submit_vo_suggest'] = gr.Button("Submit&旁白&建议", variant="primary")
         cfg['btn_submit'] = gr.Button("Submit")
         cfg['btn_suggest'] = gr.Button("建议")
 
@@ -87,8 +88,13 @@ def init(cfg):
 
     cfg['btn_com'] = btn_com
 
+    btn_start_or_finish_outputs = [cfg['btn_submit'], cfg['btn_vo'],
+                                   cfg['btn_suggest'], cfg['btn_retry'],
+                                   cfg['btn_submit_vo_suggest']]
+
     def btn_start_or_finish(finish):
         tmp = gr.update(interactive=finish)
+        tmp = (tmp,) * len(btn_start_or_finish_outputs)
 
         def _inner():
             with lock:
@@ -96,12 +102,9 @@ def init(cfg):
                     raise RuntimeError('任务中断！请稍等或Reset，如已Reset，请忽略。')
                 cfg['session_active'] = not cfg['session_active']
                 cfg['btn_stop_status'] = finish
-                return tmp, tmp, tmp, tmp
+                return tmp
 
         return _inner
-
-    btn_start_or_finish_outputs = [cfg['btn_submit'], cfg['btn_vo'],
-                                   cfg['btn_suggest'], cfg['btn_retry']]
 
     cfg['btn_concurrency'] = {
         'trigger_mode': 'once',
@@ -113,13 +116,12 @@ def init(cfg):
         'fn': btn_start_or_finish(False),
         'outputs': btn_start_or_finish_outputs
     }
+    cfg['btn_start'].update(cfg['btn_concurrency'])
 
     cfg['btn_finish'] = {
         'fn': btn_start_or_finish(True),
         'outputs': btn_start_or_finish_outputs
     }
-
-    cfg['btn_start'].update(cfg['btn_concurrency'])
     cfg['btn_finish'].update(cfg['btn_concurrency'])
 
     cfg['setting'] = [cfg[x] for x in ('setting_n_keep', 'setting_n_discard',

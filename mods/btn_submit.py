@@ -61,18 +61,26 @@ def init(cfg):
             model.venv_remove('rag')  # 销毁对应的 venv
             yield history, model.venv_info
 
+    cfg['btn_submit_fn_usr'] = {
+        'fn': btn_submit_usr,
+        'inputs': [msg, chatbot],
+        'outputs': [msg, chatbot]
+    }
+    cfg['btn_submit_fn_usr'].update(cfg['btn_concurrency'])
+
+    cfg['btn_submit_fn_bot'] = {
+        'fn': btn_submit_bot,
+        'inputs': [chatbot]+cfg['setting'],
+        'outputs': [chatbot, s_info],
+    }
+    cfg['btn_submit_fn_bot'].update(cfg['btn_concurrency'])
+
     cfg['btn_submit'].click(
         **cfg['btn_start']
     ).success(
-        fn=btn_submit_usr, api_name="submit",
-        inputs=[msg, chatbot],
-        outputs=[msg, chatbot],
-        **cfg['btn_concurrency']
+        **cfg['btn_submit_fn_usr']
     ).success(
-        fn=btn_submit_bot,
-        inputs=[chatbot]+cfg['setting'],
-        outputs=[chatbot, s_info],
-        **cfg['btn_concurrency']
+        **cfg['btn_submit_fn_bot']
     ).success(
         **cfg['btn_finish']
     )

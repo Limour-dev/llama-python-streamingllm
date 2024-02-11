@@ -30,13 +30,17 @@ def init(cfg):
             for _h in _tmp:
                 yield _h, model.venv_info
 
+    cfg['btn_vo_fn'] = {
+        'fn': btn_vo,
+        'inputs': cfg['setting'],
+        'outputs': [cfg['vo'], s_info]
+    }
+    cfg['btn_vo_fn'].update(cfg['btn_concurrency'])
+
     cfg['btn_vo'].click(
         **cfg['btn_start']
     ).success(
-        fn=btn_vo,
-        inputs=cfg['setting'],
-        outputs=[cfg['vo'], s_info],
-        **cfg['btn_concurrency']
+        **cfg['btn_vo_fn']
     ).success(
         **cfg['btn_finish']
     )
