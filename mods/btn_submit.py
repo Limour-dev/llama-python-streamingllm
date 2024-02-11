@@ -44,6 +44,8 @@ def init(cfg):
             model.eval_t(t_msg, _n_keep, _n_discard)
             yield history, model.venv_info
             # ========== 模型输出 ==========
+            if cfg['btn_stop_status']:
+                return
             model.venv_create('char')
             _tmp = btn_com(_n_keep, _n_discard,
                            _temperature, _repeat_penalty, _frequency_penalty,

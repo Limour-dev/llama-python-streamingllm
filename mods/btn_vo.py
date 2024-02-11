@@ -16,6 +16,9 @@ def init(cfg):
         with lock:
             if not cfg['session_active']:
                 raise RuntimeError
+            if cfg['btn_stop_status']:
+                yield '', model.venv_info
+                return
             # ========== 及时清理上一次生成的旁白 ==========
             model.venv_remove('vo')
             print('清理旁白', model.venv_info)

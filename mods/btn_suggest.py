@@ -16,6 +16,9 @@ def init(cfg):
         with lock:
             if not cfg['session_active']:
                 raise RuntimeError
+            if cfg['btn_stop_status']:
+                yield '', model.venv_info
+                return
             # ========== 模型输出建议 ==========
             model.venv_create('suggest')  # 创建隔离环境
             _tmp = btn_com(_n_keep, _n_discard,

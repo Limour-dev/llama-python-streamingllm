@@ -101,8 +101,10 @@ def init(cfg):
                 if cfg['session_active'] != finish:
                     raise RuntimeError('任务中断！请稍等或Reset，如已Reset，请忽略。')
                 cfg['session_active'] = not cfg['session_active']
+                yield tmp
+                if finish and cfg['btn_stop_status']:
+                    raise RuntimeError('Stop或Reset被按下，任务已中断！如非您所为，可能他人正在使用中！')
                 cfg['btn_stop_status'] = finish
-                return tmp
 
         return _inner
 
