@@ -24,11 +24,6 @@ def init(cfg):
             if not model.venv_revision('usr'):
                 yield history, model.venv_info
                 return
-            # ========== 需要临时注入的内容 ==========
-            if len(_rag) > 0:
-                model.venv_create('rag')  # 记录 venv_idx
-                t_rag = chat_template('system', _rag)
-                model.eval_t(t_rag, _n_keep, _n_discard)
             # ========== 模型输出 ==========
             model.venv_create('char')
             _tmp = btn_com(_n_keep, _n_discard,
@@ -43,17 +38,18 @@ def init(cfg):
             # ========== 输出完毕后格式化输出 ==========
             history[-1][1] = chat_display_format(history[-1][1])
             yield history, model.venv_info
-            # ========== 响应完毕后清除注入的内容 ==========
-            model.venv_remove('rag')  # 销毁对应的 venv
-            yield history, model.venv_info
+
+    cfg['btn_retry_fn'] = {
+        'fn': btn_retry,
+        'inputs': [chatbot]+cfg['setting'],
+        'outputs': [chatbot, s_info],
+    }
+    cfg['btn_retry_fn'].update(cfg['btn_concurrency'])
 
     cfg['btn_retry'].click(
         **cfg['btn_start']
     ).success(
-        fn=btn_retry,
-        inputs=[chatbot]+cfg['setting'],
-        outputs=[chatbot, s_info],
-        **cfg['btn_concurrency']
+        **cfg['btn_retry_fn']
     ).success(
         **cfg['btn_finish']
     )

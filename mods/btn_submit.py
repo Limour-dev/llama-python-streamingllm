@@ -29,11 +29,6 @@ def init(cfg):
         with lock:
             if not cfg['session_active']:
                 raise RuntimeError
-            # ========== 需要临时注入的内容 ==========
-            if len(_rag) > 0:
-                model.venv_create('rag')  # 记录 venv_idx
-                t_rag = chat_template('system', _rag)
-                model.eval_t(t_rag, _n_keep, _n_discard)
             # ========== 释放不再需要的环境 ==========
             model.venv_disband({'usr', 'char'})
             print('venv_disband char', model.venv_info)
@@ -58,9 +53,6 @@ def init(cfg):
                 yield history, model.venv_info
             # ========== 输出完毕后格式化输出 ==========
             history[-1][1] = chat_display_format(history[-1][1])
-            yield history, model.venv_info
-            # ========== 响应完毕后清除注入的内容 ==========
-            model.venv_remove('rag')  # 销毁对应的 venv
             yield history, model.venv_info
 
     cfg['btn_submit_fn_usr'] = {

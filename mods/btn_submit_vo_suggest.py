@@ -4,6 +4,8 @@ def init(cfg):
     ).success(
         **cfg['btn_submit_fn_usr']
     ).success(
+        **cfg['btn_rag_fn']
+    ).success(
         **cfg['btn_submit_fn_bot']
     ).success(
         **cfg['btn_vo_fn']
