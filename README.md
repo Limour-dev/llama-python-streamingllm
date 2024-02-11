@@ -6,6 +6,10 @@
 
 ![设置](https://raw.githubusercontent.com/Limour-dev/llama-python-streamingllm/main/2024-02/chrome_BfYDpFh9WA.webp)
 
++ 视频演示
+
+https://github.com/Limour-dev/llama-python-streamingllm/assets/93720049/6391cd79-8a90-40b2-95fe-cfe5b8ff3ac9
+
 ## 本地安装
 ```powershel
 conda create -n llamaCpp libcublas cuda-toolkit git -c nvidia -c conda-forge
