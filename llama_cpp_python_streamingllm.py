@@ -57,13 +57,15 @@ class StreamingLLM(Llama):
             self.kv_cache_seq_trim()
         return True
 
-    def venv_remove(self, name: str):
+    def venv_remove(self, name: str, keep_last=False):
         if len(self.venv) <= 1:
             return False
         if name not in self.venv_idx_map:
             return False
         venv_idx = self.venv_idx_map.index(name) + 1
         while self.venv_idx_map:
+            if keep_last and self.venv_idx_map.count(name) <= 1:
+                break  # 保留最后一个
             self.venv_idx_map.pop(venv_idx - 1)  # 删除
             if venv_idx == len(self.venv) - 1:
                 # 最后一层

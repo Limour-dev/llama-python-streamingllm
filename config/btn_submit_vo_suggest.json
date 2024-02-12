@@ -1,0 +1,9 @@
+{
+	"btn_submit_vo_suggest_combine": [
+			"btn_submit_fn_usr",
+			"btn_rag_fn",
+			"btn_submit_fn_bot",
+			"btn_vo_fn",
+			"btn_suggest_fn"
+	]
+}

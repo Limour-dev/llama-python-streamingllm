@@ -19,9 +19,6 @@ def init(cfg):
             if cfg['btn_stop_status']:
                 yield '', model.venv_info
                 return
-            # ========== 及时清理上一次生成的旁白 ==========
-            model.venv_remove('vo')
-            print('清理旁白', model.venv_info)
             # ========== 模型输出旁白 ==========
             model.venv_create('vo')  # 创建隔离环境
             _tmp = btn_com(_n_keep, _n_discard,
@@ -32,6 +29,10 @@ def init(cfg):
                            _mirostat_tau, '旁白', _max_tokens)
             for _h in _tmp:
                 yield _h, model.venv_info
+            # ========== 及时清理上一次生成的旁白 ==========
+            model.venv_remove('vo', keep_last=True)
+            yield _h, model.venv_info
+            print('清理旁白', model.venv_info)
 
     cfg['btn_vo_fn'] = {
         'fn': btn_vo,
