@@ -14,6 +14,7 @@ def init(cfg):
         cfg['btn_submit_vo_suggest'] = gr.Button("Submit&旁白&建议", variant="primary")
         cfg['btn_submit'] = gr.Button("Submit")
         cfg['btn_suggest'] = gr.Button("建议")
+        cfg['btn_status_bar'] = gr.Button("状态")
 
     cfg['btn_stop_status'] = True
 
@@ -90,7 +91,8 @@ def init(cfg):
 
     btn_start_or_finish_outputs = [cfg['btn_submit'], cfg['btn_vo'],
                                    cfg['btn_suggest'], cfg['btn_retry'],
-                                   cfg['btn_submit_vo_suggest']]
+                                   cfg['btn_submit_vo_suggest'],
+                                   cfg['btn_status_bar']]
 
     def btn_start_or_finish(finish):
         tmp = gr.update(interactive=finish)

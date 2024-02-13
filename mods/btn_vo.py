@@ -30,7 +30,7 @@ def init(cfg):
             for _h in _tmp:
                 yield _h, model.venv_info
             # ========== 及时清理上一次生成的旁白 ==========
-            model.venv_remove('vo', keep_last=True)
+            model.venv_remove('vo', keep_last=1)
             yield _h, model.venv_info
             print('清理旁白', model.venv_info)
 
