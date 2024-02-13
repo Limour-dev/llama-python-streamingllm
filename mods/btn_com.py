@@ -89,7 +89,7 @@ def init(cfg):
 
     cfg['btn_com'] = btn_com
 
-    btn_start_or_finish_outputs = [cfg['btn_submit'], cfg['btn_vo'],
+    btn_start_or_finish_outputs = [cfg['btn_submit'], cfg['btn_vo'], cfg['btn_rag'],
                                    cfg['btn_suggest'], cfg['btn_retry'],
                                    cfg['btn_submit_vo_suggest'],
                                    cfg['btn_status_bar']]
