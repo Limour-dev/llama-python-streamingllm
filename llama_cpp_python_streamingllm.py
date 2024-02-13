@@ -57,15 +57,15 @@ class StreamingLLM(Llama):
             self.kv_cache_seq_trim()
         return True
 
-    def venv_remove(self, name: str, keep_last=False):
+    def venv_remove(self, name: str, keep_last=0):
         if len(self.venv) <= 1:
             return False
         if name not in self.venv_idx_map:
             return False
         venv_idx = self.venv_idx_map.index(name) + 1
         while self.venv_idx_map:
-            if keep_last and self.venv_idx_map.count(name) <= 1:
-                break  # 保留最后一个
+            if keep_last and self.venv_idx_map.count(name) <= keep_last:
+                break  # 保留最后n个
             self.venv_idx_map.pop(venv_idx - 1)  # 删除
             if venv_idx == len(self.venv) - 1:
                 # 最后一层
@@ -282,10 +282,9 @@ class StreamingLLM(Llama):
                     self._input_ids, self._scores[-1, :]
             ):
                 return
-            tokens_or_none = yield token
-            tokens = [token]
-            if tokens_or_none is not None:
-                tokens.extend(tokens_or_none)
+            tokens = yield token
+            if tokens is None:
+                tokens = [token]
 
     def load_session(self, filepath: str):
         n_tokens = POINTER(llama_cpp.c_size_t)(llama_cpp.c_size_t(0))

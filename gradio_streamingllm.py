@@ -25,6 +25,9 @@ from mods.btn_suggest import init as btn_suggest_init
 # ========== 融合功能的按钮 ==========
 from mods.btn_submit_vo_suggest import init as btn_submit_vo_suggest_init
 
+# ========== 更新状态栏的按钮 ==========
+from mods.btn_status_bar import init as btn_status_bar_init
+
 # ========== 重置按钮 ==========
 from mods.btn_reset import init as btn_reset_init
 
@@ -98,10 +101,17 @@ with gr.Blocks() as chatting:
     with gr.Row(equal_height=True):
         cfg['chatbot'] = gr.Chatbot(height='60vh', scale=2, value=cfg['chatbot'],
                                     avatar_images=(r'assets/user.png', r'assets/chatbot.webp'))
-        with gr.Column(scale=1, elem_id="area"):
-            cfg['rag'] = gr.Textbox(label='RAG', lines=2, show_copy_button=True, elem_id="RAG-area")
-            cfg['vo'] = gr.Textbox(label='VO', show_copy_button=True, elem_id="VO-area")
-            cfg['s_info'] = gr.Textbox(value=cfg['model'].venv_info, max_lines=1, label='info', interactive=False)
+        with gr.Column(scale=1):
+            with gr.Tab(label='Main', elem_id='area'):
+                cfg['rag'] = gr.Textbox(label='RAG', lines=2, show_copy_button=True, elem_classes="area")
+                cfg['vo'] = gr.Textbox(label='VO', lines=2, show_copy_button=True, elem_classes="area")
+                cfg['s_info'] = gr.Textbox(value=cfg['model'].venv_info, max_lines=1, label='info', interactive=False)
+            with gr.Tab(label='状态栏', elem_id='area'):
+                cfg['status_bar'] = gr.Dataframe(
+                    headers=['属性', '值'],
+                    type="array",
+                    elem_id='StatusBar'
+                )
     cfg['msg'] = gr.Textbox(label='Prompt', lines=2, max_lines=2, elem_id='prompt', autofocus=True, **cfg['msg'])
 
     cfg['gr'] = gr
@@ -119,37 +129,27 @@ with gr.Blocks() as chatting:
 
     btn_submit_vo_suggest_init(cfg)
 
+    btn_status_bar_init(cfg)
+
     # ========== 用于调试 ==========
     btn_reset_init(cfg)
 
 #  ========== 让聊天界面的文本框等高 ==========
 custom_css = r'''
-#area > div {
-    height: 100%;
+#area > div > div {
+    height: 53vh;
 }
-#RAG-area {
+.area {
     flex-grow: 1;
 }
-#RAG-area > label {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-#RAG-area > label > textarea {
-    flex-grow: 1;
-    max-height: 20vh;
-}
-#VO-area {
-    flex-grow: 1;
-}
-#VO-area > label {
+.area > label {
     height: 100%;
     display: flex;
     flex-direction: column;
+    max-height: 16vh;
 }
-#VO-area > label > textarea {
+.area > label > textarea {
     flex-grow: 1;
-    max-height: 20vh;
 }
 #prompt > label > textarea {
     max-height: 63px;
@@ -161,6 +161,9 @@ custom_css = r'''
 }
 .setting input {
     margin-top: auto;
+}
+#StatusBar {
+    max-height: 53vh;
 }
 '''
 
