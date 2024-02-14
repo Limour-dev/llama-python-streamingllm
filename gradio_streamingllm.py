@@ -74,6 +74,9 @@ with gr.Blocks() as setting:
                                                 **cfg['setting_mirostat_eta'])
         cfg['setting_mirostat_tau'] = gr.Number(label="Mirostat 目标熵", interactive=True,
                                                 **cfg['setting_mirostat_tau'])
+    with gr.Row(elem_classes='setting'):
+        cfg['setting_btn_vo_keep_last'] = gr.Number(label="旁白限制", interactive=True,
+                                                    **cfg['setting_btn_vo_keep_last'])
 
     #  ========== 加载模型 ==========
     cfg['model'] = StreamingLLM(model_path=cfg['setting_path'].value,
