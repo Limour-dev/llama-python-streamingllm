@@ -155,7 +155,7 @@ class StreamingLLM(Llama):
             mirostat_eta: float = 0.1,
             mirostat_tau: float = 5.0,
             penalize_nl: bool = True,
-            logits_processor: Optional[LogitsProcessorList] = None,
+            logits_processor=None,
             grammar: Optional[LlamaGrammar] = None,
     ):
         last_n_tokens_data = [llama_cpp.llama_token(0)] * max(
