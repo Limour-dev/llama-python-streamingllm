@@ -1,0 +1,53 @@
+{
+	"btn_status_bar_list":[
+		{
+			"key": "当前时间",
+			"desc": "",
+			"combine": [
+				{
+					"prefix": ":第",
+					"type": "int",
+					"unit": "天"
+				},
+				{
+					"prefix": "",
+					"type": "set",
+					"value": [
+						"上午",
+						"下午",
+						"黄昏",
+						"夜晚"
+					]
+				}
+			]
+		},
+		{
+			"key": "当前地点",
+			"desc": "",
+			"combine": [
+				{
+					"prefix": ":",
+					"type": "str"
+				}
+			]
+		},
+		{
+			"key": "{{char}}对{{user}}的好感度",
+			"desc": "(厌恶|冷漠|陌生|友好|信任|爱恋)",
+			"combine": [
+				{
+					"prefix": ":",
+					"type": "set",
+					"value": [
+						"厌恶",
+						"冷漠",
+						"陌生",
+						"友好",
+						"信任",
+						"爱恋"
+					]
+				}
+			]
+		}
+	]
+}
