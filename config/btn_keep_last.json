@@ -1,0 +1,8 @@
+{
+	"setting_btn_vo_keep_last": {
+		"value": 2,
+		"step": 1,
+		"minimum": 1,
+		"info": "最多保留多少次旁白"
+	}
+}
