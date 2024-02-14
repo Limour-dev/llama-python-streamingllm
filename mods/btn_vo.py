@@ -12,7 +12,7 @@ def init(cfg):
                _top_p, _min_p, _typical_p,
                _tfs_z, _mirostat_mode, _mirostat_eta,
                _mirostat_tau, _usr, _char,
-               _rag, _max_tokens):
+               _rag, _max_tokens, _keep_last: int):
         with lock:
             if not cfg['session_active']:
                 raise RuntimeError
@@ -30,13 +30,13 @@ def init(cfg):
             for _h in _tmp:
                 yield _h, model.venv_info
             # ========== 及时清理上一次生成的旁白 ==========
-            model.venv_remove('vo', keep_last=1)
+            model.venv_remove('vo', keep_last=_keep_last)
             yield _h, model.venv_info
             print('清理旁白', model.venv_info)
 
     cfg['btn_vo_fn'] = {
         'fn': btn_vo,
-        'inputs': cfg['setting'],
+        'inputs': cfg['setting'] + [cfg['setting_btn_vo_keep_last']],
         'outputs': [cfg['vo'], s_info]
     }
     cfg['btn_vo_fn'].update(cfg['btn_concurrency'])
