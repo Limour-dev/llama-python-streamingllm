@@ -84,7 +84,7 @@ def init(cfg):
         # ========== 查看末尾的换行符 ==========
         print('history', repr(history))
         # ========== 给 kv_cache 加上输出结束符 ==========
-        model.eval_t(chat_template.im_end_nl, _n_keep, _n_discard)
+        model.eval_t(chat_template.im_end_nl, _n_keep, _n_discard, chat_template.im_start_token)
         t_bot.extend(chat_template.im_end_nl)
 
     cfg['btn_com'] = btn_com
