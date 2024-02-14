@@ -30,7 +30,7 @@ def init(cfg):
             # ========== 需要临时注入的内容 ==========
             model.venv_create('rag')
             t_rag = chat_template('system', _rag)
-            model.eval_t(t_rag, _n_keep, _n_discard)
+            model.eval_t(t_rag, _n_keep, _n_discard, chat_template.im_start_token)
             yield model.venv_info
 
     cfg['btn_rag_fn'] = {

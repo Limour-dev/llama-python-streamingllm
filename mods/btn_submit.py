@@ -36,7 +36,7 @@ def init(cfg):
             model.venv_create('usr')
             t_msg = history[-1][0]
             t_msg = chat_template(_usr, t_msg)
-            model.eval_t(t_msg, _n_keep, _n_discard)
+            model.eval_t(t_msg, _n_keep, _n_discard, chat_template.im_start_token)
             yield history, model.venv_info
             # ========== 模型输出 ==========
             if cfg['btn_stop_status']:
