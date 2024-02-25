@@ -6,6 +6,118 @@ from ctypes import POINTER
 from KMP_list import kmp_search, compute_lps_array
 
 
+class LLMGenerate:
+    def __init__(
+            self,
+            model,
+            n_keep,
+            n_discard: int = 256,
+            im_start=None,
+            top_k: int = 40,
+            top_p: float = 0.95,
+            min_p: float = 0.05,
+            typical_p: float = 1.0,
+            temp: float = 0.80,
+            repeat_penalty: float = 1.1,
+            repeat_last_n: int = 64,
+            frequency_penalty: float = 0.0,
+            presence_penalty: float = 0.0,
+            tfs_z: float = 1.0,
+            mirostat_mode: int = 0,
+            mirostat_tau: float = 5.0,
+            mirostat_eta: float = 0.1
+    ):
+        def _eval_t(tokens):
+            return model.eval_t(
+                tokens=tokens,
+                n_keep=n_keep,
+                n_discard=n_discard,
+                im_start=im_start
+            )
+
+        def _sample_t(logits_processor):
+            return model.sample_t(
+                top_k=top_k,
+                top_p=top_p,
+                min_p=min_p,
+                typical_p=typical_p,
+                temp=temp,
+                repeat_penalty=repeat_penalty,
+                repeat_last_n=repeat_last_n,
+                frequency_penalty=frequency_penalty,
+                presence_penalty=presence_penalty,
+                tfs_z=tfs_z,
+                mirostat_mode=mirostat_mode,
+                mirostat_tau=mirostat_tau,
+                mirostat_eta=mirostat_eta,
+                logits_processor=logits_processor
+            )
+
+        self._eval_t = _eval_t
+        self._sample_t = _sample_t
+        self.str_detokenize = model.str_detokenize
+        self.venv_pop_token = model.venv_pop_token
+        # ========== 保存输出 ==========
+        self.t_bot = []
+        self.completion_tokens = []
+        self.history = ''
+        self.token = None
+
+    def eval_t(self, tokens):
+        # ========== 避免不完整的utf-8编码 ==========
+        self.completion_tokens.extend(tokens)
+        all_text = self.str_detokenize(self.completion_tokens)
+        if all_text:
+            self.t_bot.extend(self.completion_tokens)
+            self.history += all_text
+            self.completion_tokens = []
+        return self._eval_t(tokens)
+
+    def sample_t(self, logits_processor):
+        self.token = self._sample_t(logits_processor)
+        return self.token
+
+    def endswith_t(self, token_list):
+        return self.token in token_list
+
+    def endswith_func(self, start_func, func_list, com_func=str.rstrip, eval_t=True):
+        self.completion_tokens.append(self.token)
+        all_text = self.str_detokenize(self.completion_tokens)
+        if all_text:  # 完整了
+
+            if eval_t:
+                self.t_bot.extend(self.completion_tokens)  # 节省开销
+                self.history += all_text
+                self.completion_tokens = []
+
+                history = self.history
+                t_bot = self.t_bot
+            else:
+                history = self.history + all_text
+                t_bot = self.t_bot + self.completion_tokens
+
+            if start_func(history):
+                history = com_func(history)
+                for func in func_list:
+                    if func(history):
+                        n = len(t_bot)
+                        for i in range(1, n):  # 找出需要弃置的tokens长度
+                            tmp = self.str_detokenize(t_bot[n - i:])
+                            tmp = com_func(tmp)
+                            if func(tmp):
+                                if i > 1:  # 最后一个token并未进入kv_cache
+                                    self.venv_pop_token(i - 1)
+                                if history.endswith(tmp):
+                                    self.history = history[:-len(tmp)]  # 移除末尾的tmp
+                                return True
+
+        if eval_t:
+            self._eval_t([self.token])  # 避免再执行一次 eval_t
+        else:
+            self.completion_tokens.pop()  # 删除 append 的 token
+        return False
+
+
 class StreamingLLM(Llama):
     def __init__(self, model_path: str, **kwargs):
         super().__init__(model_path, **kwargs)
