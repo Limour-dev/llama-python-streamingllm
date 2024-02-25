@@ -77,44 +77,43 @@ class LLMGenerate:
         self.token = self._sample_t(logits_processor)
         return self.token
 
+    def detokenize_sample_t(self):
+        self.completion_tokens.append(self.token)
+        all_text = self.str_detokenize(self.completion_tokens)
+        if not all_text:
+            return False
+        self.t_bot.extend(self.completion_tokens)
+        self.history += all_text
+        self.completion_tokens = []
+        return True
+
+    def eval_sample_t(self):
+        return self._eval_t([self.token])
+
     def endswith_t(self, token_list):
         return self.token in token_list
 
-    def endswith_func(self, start_func, func_list, com_func=str.rstrip, eval_t=True):
-        self.completion_tokens.append(self.token)
-        all_text = self.str_detokenize(self.completion_tokens)
-        if all_text:  # 完整了
+    def endswith_s(self, start_func, str_list, com_func=str.rstrip):
+        if self.completion_tokens:  # 不完整
+            return False
 
-            if eval_t:
-                self.t_bot.extend(self.completion_tokens)  # 节省开销
-                self.history += all_text
-                self.completion_tokens = []
+        history = self.history
+        t_bot = self.t_bot
 
-                history = self.history
-                t_bot = self.t_bot
-            else:
-                history = self.history + all_text
-                t_bot = self.t_bot + self.completion_tokens
-
-            if start_func(history):
-                history = com_func(history)
-                for func in func_list:
-                    if func(history):
-                        n = len(t_bot)
-                        for i in range(1, n):  # 找出需要弃置的tokens长度
-                            tmp = self.str_detokenize(t_bot[n - i:])
-                            tmp = com_func(tmp)
-                            if func(tmp):
-                                if i > 1:  # 最后一个token并未进入kv_cache
-                                    self.venv_pop_token(i - 1)
-                                if history.endswith(tmp):
-                                    self.history = history[:-len(tmp)]  # 移除末尾的tmp
-                                return True
-
-        if eval_t:
-            self._eval_t([self.token])  # 避免再执行一次 eval_t
-        else:
-            self.completion_tokens.pop()  # 删除 append 的 token
+        if start_func(history):
+            history = com_func(history)
+            for x in str_list:
+                if history.endswith(x):
+                    n = len(t_bot)
+                    for i in range(1, n):  # 找出需要弃置的tokens长度
+                        tmp = self.str_detokenize(t_bot[n - i:])
+                        tmp = com_func(tmp)
+                        if tmp.endswith(x):
+                            if i > 1:  # 最后一个token并未进入kv_cache
+                                self.venv_pop_token(i - 1)
+                            if history.endswith(tmp):
+                                self.history = history[:-len(tmp)]  # 移除末尾的tmp
+                            return True
         return False
 
 
