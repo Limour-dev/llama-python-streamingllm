@@ -10,6 +10,12 @@ https://github.com/Limour-dev/llama-python-streamingllm/assets/93720049/6391cd79
 
 ![设置](https://raw.githubusercontent.com/Limour-dev/llama-python-streamingllm/main/2024-02/chrome_BfYDpFh9WA.webp)
 
++ The debugging interface will output the probability of sampling.
++ 调试界面输出取样的概率
+
+![55164f647e1d76519697e8b283de777](https://github.com/Limour-dev/llama-python-streamingllm/assets/93720049/55d7028d-e4f1-4cd5-a62c-d7f53fea03fc)
+
+
 ## Huggingface Spaces
 + First, check if Huggingface is working properly
 + 先检查 Huggingface 是否正常：[status.huggingface.co](https://status.huggingface.co/)
