@@ -4,6 +4,7 @@ from llama_cpp import Llama, LogitsProcessorList, LlamaGrammar, llama_cpp, npt, 
 from ctypes import POINTER
 
 from KMP_list import kmp_search, compute_lps_array
+from Turbo_Colormap import map_value_to_color, NOCOLOR, LEGEND
 
 
 class LLMGenerate:
@@ -204,6 +205,32 @@ class StreamingLLM(Llama):
     @property
     def venv_info(self):
         return str((self.n_tokens, self.venv, self.venv_idx_map))
+
+    def venv_viz(self):
+        completion_tokens = []
+        history = LEGEND + '\n'
+        text_color = NOCOLOR
+        for i in range(self.venv[-1]):
+            idx = self.n_tokens - self.venv[-1] + i
+            token = self._input_ids[idx]
+            if not completion_tokens:  # 不完整则是第一个token
+                # ========== 获取对应token的概率 ==========
+                score = self.scores[idx-1: idx, :].ravel()  # 第i个token的分数是前i-1个token预测的，所以减一
+                score = np.exp(score)  # 空白则全1，但无所谓了
+                sum_score = np.sum(score)
+                probabilities = score[token] / sum_score
+                if probabilities < 0.001:
+                    text_color = NOCOLOR
+                else:
+                    text_color = map_value_to_color(probabilities)
+            # ========== 避免不完整的utf-8编码 ==========
+            completion_tokens.append(token)
+            all_text = self.str_detokenize(completion_tokens)
+            if not all_text:
+                continue
+            completion_tokens = []  # 完整则清空缓存
+            history += (text_color + all_text)
+        return history + NOCOLOR
 
     def kv_cache_seq_ltrim(self, n_keep, n_discard=256, n_past=-1, im_start=None):
         if n_keep < 0:

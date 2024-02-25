@@ -54,6 +54,8 @@ def map_value_to_color(value):
 
 NOCOLOR = "\033[0m"
 
+LEGEND = ''.join(map_value_to_color(value/32) + "█" for value in range(32)) + NOCOLOR
+
 if __name__ == '__main__':
     # 创建颜色常量列表
     colors = []
