@@ -54,6 +54,7 @@ def init(cfg):
             # ========== 输出完毕后格式化输出 ==========
             history[-1][1] = chat_display_format(history[-1][1])
             yield history, model.venv_info
+            print(model.venv_viz())  # 调试用
 
     cfg['btn_submit_fn_usr'] = {
         'fn': btn_submit_usr,
