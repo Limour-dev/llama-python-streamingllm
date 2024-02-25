@@ -63,8 +63,9 @@ class StreamingLLM(Llama):
         if name not in self.venv_idx_map:
             return False
         venv_idx = self.venv_idx_map.index(name) + 1
+        count_name = self.venv_idx_map.count(name) if keep_last else 0
         while self.venv_idx_map:
-            if keep_last and self.venv_idx_map.count(name) <= keep_last:
+            if keep_last and count_name <= keep_last:
                 break  # 保留最后n个
             self.venv_idx_map.pop(venv_idx - 1)  # 删除
             if venv_idx == len(self.venv) - 1:
@@ -81,6 +82,7 @@ class StreamingLLM(Llama):
                     venv_idx = self.venv_idx_map.index(name, venv_idx - 1) + 1
                 except ValueError:  # 没有了
                     break
+            count_name -= 1  # 计数减一
         return True
 
     def venv_pop_token(self, n=1):
