@@ -54,19 +54,9 @@ def map_value_to_color(value):
 
 NOCOLOR = "\033[0m"
 
-LEGEND = ''.join(map_value_to_color(value/32) + "█" for value in range(32)) + NOCOLOR
+BACK_WHITE = '\x1b[47m'
+
+LEGEND = BACK_WHITE + ''.join(map_value_to_color(value/32) + "█" for value in range(32)) + NOCOLOR
 
 if __name__ == '__main__':
-    # 创建颜色常量列表
-    colors = []
-
-    # 将0到1的数值映射成颜色并添加到列表中
-    for i in range(256):
-        value = i / 256
-        color = map_value_to_color(value)
-        colors.append(color)
-
-    # 打印颜色常量列表
-    for color in colors:
-        print(color + "█", end="")
-    print(NOCOLOR)  # 重置颜色
+    print(LEGEND)

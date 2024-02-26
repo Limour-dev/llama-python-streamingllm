@@ -4,7 +4,7 @@ from llama_cpp import Llama, LogitsProcessorList, LlamaGrammar, llama_cpp, npt, 
 from ctypes import POINTER
 
 from KMP_list import kmp_search, compute_lps_array
-from Turbo_Colormap import map_value_to_color, NOCOLOR, LEGEND
+from Turbo_Colormap import map_value_to_color, NOCOLOR, LEGEND, BACK_WHITE
 
 
 class LLMGenerate:
@@ -222,14 +222,18 @@ class StreamingLLM(Llama):
                 if probabilities < 0.001:
                     text_color = NOCOLOR
                 else:
-                    text_color = map_value_to_color(probabilities)
+                    if text_color is NOCOLOR:
+                        text_color = BACK_WHITE + map_value_to_color(probabilities)
+                    else:
+                        text_color = map_value_to_color(probabilities)
+                history += text_color
             # ========== 避免不完整的utf-8编码 ==========
             completion_tokens.append(token)
             all_text = self.str_detokenize(completion_tokens)
             if not all_text:
                 continue
             completion_tokens = []  # 完整则清空缓存
-            history += (text_color + all_text)
+            history += repr(all_text)[1:-1]
         return history + NOCOLOR
 
     def kv_cache_seq_ltrim(self, n_keep, n_discard=256, n_past=-1, im_start=None):
