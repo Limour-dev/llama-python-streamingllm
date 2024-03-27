@@ -1,9 +1,15 @@
 {
 	"setting_path": {
-		"value": "D:\\models\\causallm_7b.Q5_K_M.gguf"
+		"value": "D:\\models\\causallm_7b.IQ4_NL.gguf"
 	},
 	"setting_ctx": {
 		"value": 4095
+	},
+	"setting_type_k": {
+		"value": "f16"
+	},
+	"setting_type_v": {
+		"value": "f16"
 	},
 	"role_usr": {
 		"value": "无忌"

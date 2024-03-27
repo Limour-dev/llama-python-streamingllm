@@ -50,6 +50,8 @@ with gr.Blocks() as setting:
         cfg['setting_n_gpu_layers'] = gr.Number(label="n_gpu_layers", scale=1, **cfg['setting_n_gpu_layers'])
     with gr.Row(elem_classes='setting'):
         cfg['setting_ctx'] = gr.Number(label="上下文大小（Tokens）", **cfg['setting_ctx'])
+        cfg['setting_type_k'] = gr.Textbox(label="type_k", max_lines=1, **cfg['setting_type_k'])
+        cfg['setting_type_v'] = gr.Textbox(label="type_v", max_lines=1, **cfg['setting_type_v'])
         cfg['setting_max_tokens'] = gr.Number(label="最大响应长度（Tokens）", interactive=True,
                                               **cfg['setting_max_tokens'])
         cfg['setting_n_keep'] = gr.Number(value=10, label="n_keep", interactive=False)
@@ -82,7 +84,10 @@ with gr.Blocks() as setting:
     cfg['model'] = StreamingLLM(model_path=cfg['setting_path'].value,
                                 seed=cfg['setting_seed'].value,
                                 n_gpu_layers=cfg['setting_n_gpu_layers'].value,
-                                n_ctx=cfg['setting_ctx'].value)
+                                n_ctx=cfg['setting_ctx'].value,
+                                type_k=cfg['setting_type_k'].value,
+                                type_v=cfg['setting_type_v'].value,
+                                )
     cfg['chat_template'] = ChatTemplate(cfg['model'])
     cfg['setting_ctx'].value = cfg['model'].n_ctx()
 

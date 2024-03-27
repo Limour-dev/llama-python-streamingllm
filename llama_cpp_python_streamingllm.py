@@ -1,7 +1,11 @@
-from typing import Optional, Sequence, Generator
-
-from llama_cpp import Llama, LogitsProcessorList, LlamaGrammar, llama_cpp, npt, np, StoppingCriteriaList
-from ctypes import POINTER
+from llama_cpp import *
+from ctypes import POINTER, c_size_t
+from llama_cpp._internals import (
+    _LlamaModel,  # type: ignore
+    _LlamaContext,  # type: ignore
+    _LlamaBatch,  # type: ignore
+    _LlamaTokenDataArray,  # type: ignore
+)
 
 from KMP_list import kmp_search, compute_lps_array
 from Turbo_Colormap import map_value_to_color, NOCOLOR, LEGEND, BACK_WHITE
@@ -118,9 +122,395 @@ class LLMGenerate:
         return False
 
 
+kv_cache_type = {
+    'f32': 0,
+    'f16': 1,
+    'q8_0': 8,
+    'q4_0': 2,
+    'q4_1': 3,
+    'iq4_nl': 20,
+    'q5_0': 6,
+    'q5_1': 7
+}
+
 class StreamingLLM(Llama):
-    def __init__(self, model_path: str, **kwargs):
-        super().__init__(model_path, **kwargs)
+
+    __backend_initialized = False
+
+    def __init__(
+        self,
+        model_path: str,
+        *,
+        # Model Params
+        n_gpu_layers: int = 0,
+        split_mode: int = llama_cpp.LLAMA_SPLIT_MODE_LAYER,
+        main_gpu: int = 0,
+        tensor_split: Optional[List[float]] = None,
+        vocab_only: bool = False,
+        use_mmap: bool = True,
+        use_mlock: bool = False,
+        kv_overrides: Optional[Dict[str, Union[bool, int, float]]] = None,
+        # Context Params
+        seed: int = llama_cpp.LLAMA_DEFAULT_SEED,
+        n_ctx: int = 512,
+        n_batch: int = 512,
+        n_threads: Optional[int] = None,
+        n_threads_batch: Optional[int] = None,
+        rope_scaling_type: Optional[int] = llama_cpp.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED,
+        pooling_type: int = llama_cpp.LLAMA_POOLING_TYPE_UNSPECIFIED,
+        rope_freq_base: float = 0.0,
+        rope_freq_scale: float = 0.0,
+        yarn_ext_factor: float = -1.0,
+        yarn_attn_factor: float = 1.0,
+        yarn_beta_fast: float = 32.0,
+        yarn_beta_slow: float = 1.0,
+        yarn_orig_ctx: int = 0,
+        logits_all: bool = False,
+        embedding: bool = False,
+        offload_kqv: bool = True,
+        # Sampling Params
+        last_n_tokens_size: int = 64,
+        # LoRA Params
+        lora_base: Optional[str] = None,
+        lora_scale: float = 1.0,
+        lora_path: Optional[str] = None,
+        # Backend Params
+        numa: Union[bool, int] = False,
+        # Chat Format Params
+        chat_format: Optional[str] = None,
+        chat_handler: Optional[llama_chat_format.LlamaChatCompletionHandler] = None,
+        # Speculative Decoding
+        draft_model: Optional[LlamaDraftModel] = None,
+        # Tokenizer Override
+        tokenizer: Optional[BaseLlamaTokenizer] = None,
+        # Misc
+        verbose: bool = True,
+        # Extra Params
+        type_k: str = 'f16',
+        type_v: str = 'f16',
+        **kwargs,  # type: ignore
+    ):
+        """Load a llama.cpp model from `model_path`.
+
+        Examples:
+            Basic usage
+
+            >>> import llama_cpp
+            >>> model = llama_cpp.Llama(
+            ...     model_path="path/to/model",
+            ... )
+            >>> print(model("The quick brown fox jumps ", stop=["."])["choices"][0]["text"])
+            the lazy dog
+
+            Loading a chat model
+
+            >>> import llama_cpp
+            >>> model = llama_cpp.Llama(
+            ...     model_path="path/to/model",
+            ...     chat_format="llama-2",
+            ... )
+            >>> print(model.create_chat_completion(
+            ...     messages=[{
+            ...         "role": "user",
+            ...         "content": "what is the meaning of life?"
+            ...     }]
+            ... ))
+
+        Args:
+            model_path: Path to the model.
+            n_gpu_layers: Number of layers to offload to GPU (-ngl). If -1, all layers are offloaded.
+            split_mode: How to split the model across GPUs. See llama_cpp.LLAMA_SPLIT_* for options.
+            main_gpu: main_gpu interpretation depends on split_mode: LLAMA_SPLIT_NONE: the GPU that is used for the entire model. LLAMA_SPLIT_ROW: the GPU that is used for small tensors and intermediate results. LLAMA_SPLIT_LAYER: ignored
+            tensor_split: How split tensors should be distributed across GPUs. If None, the model is not split.
+            vocab_only: Only load the vocabulary no weights.
+            use_mmap: Use mmap if possible.
+            use_mlock: Force the system to keep the model in RAM.
+            kv_overrides: Key-value overrides for the model.
+            seed: RNG seed, -1 for random
+            n_ctx: Text context, 0 = from model
+            n_batch: Prompt processing maximum batch size
+            n_threads: Number of threads to use for generation
+            n_threads_batch: Number of threads to use for batch processing
+            rope_scaling_type: RoPE scaling type, from `enum llama_rope_scaling_type`. ref: https://github.com/ggerganov/llama.cpp/pull/2054
+            pooling_type: Pooling type, from `enum llama_pooling_type`.
+            rope_freq_base: RoPE base frequency, 0 = from model
+            rope_freq_scale: RoPE frequency scaling factor, 0 = from model
+            yarn_ext_factor: YaRN extrapolation mix factor, negative = from model
+            yarn_attn_factor: YaRN magnitude scaling factor
+            yarn_beta_fast: YaRN low correction dim
+            yarn_beta_slow: YaRN high correction dim
+            yarn_orig_ctx: YaRN original context size
+            logits_all: Return logits for all tokens, not just the last token. Must be True for completion to return logprobs.
+            embedding: Embedding mode only.
+            offload_kqv: Offload K, Q, V to GPU.
+            last_n_tokens_size: Maximum number of tokens to keep in the last_n_tokens deque.
+            lora_base: Optional path to base model, useful if using a quantized base model and you want to apply LoRA to an f16 model.
+            lora_path: Path to a LoRA file to apply to the model.
+            numa: numa policy
+            chat_format: String specifying the chat format to use when calling create_chat_completion.
+            chat_handler: Optional chat handler to use when calling create_chat_completion.
+            draft_model: Optional draft model to use for speculative decoding.
+            tokenizer: Optional tokenizer to override the default tokenizer from llama.cpp.
+            verbose: Print verbose output to stderr.
+
+        Raises:
+            ValueError: If the model path does not exist.
+
+        Returns:
+            A Llama instance.
+        """
+        self.verbose = verbose
+
+        set_verbose(verbose)
+
+        if not StreamingLLM.__backend_initialized:
+            with suppress_stdout_stderr(disable=verbose):
+                llama_cpp.llama_backend_init()
+            StreamingLLM.__backend_initialized = True
+
+        if isinstance(numa, bool):
+            self.numa = (
+                llama_cpp.GGML_NUMA_STRATEGY_DISTRIBUTE
+                if numa
+                else llama_cpp.GGML_NUMA_STRATEGY_DISABLED
+            )
+        else:
+            self.numa = numa
+
+        if self.numa != llama_cpp.GGML_NUMA_STRATEGY_DISABLED:
+            with suppress_stdout_stderr(disable=verbose):
+                llama_cpp.llama_numa_init(self.numa)
+
+        self.model_path = model_path
+
+        # Model Params
+        self.model_params = llama_cpp.llama_model_default_params()
+        self.model_params.n_gpu_layers = (
+            0x7FFFFFFF if n_gpu_layers == -1 else n_gpu_layers
+        )  # 0x7FFFFFFF is INT32 max, will be auto set to all layers
+        self.model_params.split_mode = split_mode
+        self.model_params.main_gpu = main_gpu
+        self.tensor_split = tensor_split
+        self._c_tensor_split = None
+        if self.tensor_split is not None:
+            if len(self.tensor_split) > llama_cpp.LLAMA_MAX_DEVICES:
+                raise ValueError(
+                    f"Attempt to split tensors that exceed maximum supported devices. Current LLAMA_MAX_DEVICES={llama_cpp.LLAMA_MAX_DEVICES}"
+                )
+            # Type conversion and expand the list to the length of LLAMA_MAX_DEVICES
+            FloatArray = ctypes.c_float * llama_cpp.LLAMA_MAX_DEVICES
+            self._c_tensor_split = FloatArray(
+                *tensor_split  # type: ignore
+            )  # keep a reference to the array so it is not gc'd
+            self.model_params.tensor_split = self._c_tensor_split
+        self.model_params.vocab_only = vocab_only
+        self.model_params.use_mmap = use_mmap if lora_path is None else False
+        self.model_params.use_mlock = use_mlock
+
+        # kv_overrides is the original python dict
+        self.kv_overrides = kv_overrides
+        if kv_overrides is not None:
+            # _kv_overrides_array is a ctypes.Array of llama_model_kv_override Structs
+            kvo_array_len = len(kv_overrides) + 1  # for sentinel element
+            self._kv_overrides_array = (
+                llama_cpp.llama_model_kv_override * kvo_array_len
+            )()
+
+            for i, (k, v) in enumerate(kv_overrides.items()):
+                self._kv_overrides_array[i].key = k.encode("utf-8")
+                if isinstance(v, bool):
+                    self._kv_overrides_array[i].tag = llama_cpp.LLAMA_KV_OVERRIDE_TYPE_BOOL
+                    self._kv_overrides_array[i].value.bool_value = v
+                elif isinstance(v, int):
+                    self._kv_overrides_array[i].tag = llama_cpp.LLAMA_KV_OVERRIDE_TYPE_INT
+                    self._kv_overrides_array[i].value.int_value = v
+                elif isinstance(v, float):
+                    self._kv_overrides_array[i].tag = llama_cpp.LLAMA_KV_OVERRIDE_TYPE_FLOAT
+                    self._kv_overrides_array[i].value.float_value = v
+                else:
+                    raise ValueError(f"Unknown value type for {k}: {v}")
+
+            self._kv_overrides_array[-1].key = (
+                b"\0"  # ensure sentinel element is zeroed
+            )
+            self.model_params.kv_overrides = self._kv_overrides_array
+
+        self.n_batch = min(n_ctx, n_batch)  # ???
+        self.n_threads = n_threads or max(multiprocessing.cpu_count() // 2, 1)
+        self.n_threads_batch = n_threads_batch or max(
+            multiprocessing.cpu_count() // 2, 1
+        )
+
+        # Context Params
+        self.context_params = llama_cpp.llama_context_default_params()
+        self.context_params.seed = seed
+        self.context_params.n_ctx = n_ctx
+        self.context_params.n_batch = self.n_batch
+        self.context_params.n_threads = self.n_threads
+        self.context_params.n_threads_batch = self.n_threads_batch
+        self.context_params.rope_scaling_type = (
+            rope_scaling_type
+            if rope_scaling_type is not None
+            else llama_cpp.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED
+        )
+        self.context_params.pooling_type = pooling_type
+        self.context_params.rope_freq_base = (
+            rope_freq_base if rope_freq_base != 0.0 else 0
+        )
+        self.context_params.rope_freq_scale = (
+            rope_freq_scale if rope_freq_scale != 0.0 else 0
+        )
+        self.context_params.yarn_ext_factor = (
+            yarn_ext_factor if yarn_ext_factor != 0.0 else 0
+        )
+        self.context_params.yarn_attn_factor = (
+            yarn_attn_factor if yarn_attn_factor != 0.0 else 0
+        )
+        self.context_params.yarn_beta_fast = (
+            yarn_beta_fast if yarn_beta_fast != 0.0 else 0
+        )
+        self.context_params.yarn_beta_slow = (
+            yarn_beta_slow if yarn_beta_slow != 0.0 else 0
+        )
+        self.context_params.yarn_orig_ctx = yarn_orig_ctx if yarn_orig_ctx != 0 else 0
+        self.context_params.logits_all = (
+            logits_all if draft_model is None else True
+        )  # Must be set to True for speculative decoding
+        self.context_params.embeddings = embedding # TODO: Rename to embeddings
+
+        #  KV cache quantization
+        print(self.context_params.type_k, self.context_params.type_v)
+        self.context_params.type_k = kv_cache_type[type_k]
+        self.context_params.type_v = kv_cache_type[type_v]
+
+        self.context_params.offload_kqv = offload_kqv
+
+        # Sampling Params
+        self.last_n_tokens_size = last_n_tokens_size
+
+        self.cache: Optional[BaseLlamaCache] = None
+
+        self.lora_base = lora_base
+        self.lora_scale = lora_scale
+        self.lora_path = lora_path
+
+        if not os.path.exists(model_path):
+            raise ValueError(f"Model path does not exist: {model_path}")
+
+        self._model = _LlamaModel(
+            path_model=self.model_path, params=self.model_params, verbose=self.verbose
+        )
+
+        # Override tokenizer
+        self.tokenizer_ = tokenizer or LlamaTokenizer(self)
+
+        # Set the default value for the context and correct the batch
+        if n_ctx == 0:
+            n_ctx = self._model.n_ctx_train()
+            self.n_batch = min(n_ctx, n_batch)
+            self.context_params.n_ctx = self._model.n_ctx_train()
+            self.context_params.n_batch = self.n_batch
+
+        self._ctx = _LlamaContext(
+            model=self._model,
+            params=self.context_params,
+            verbose=self.verbose,
+        )
+
+        self._batch = _LlamaBatch(
+            n_tokens=self.n_batch,
+            embd=0,
+            n_seq_max=self.context_params.n_ctx,
+            verbose=self.verbose,
+        )
+
+        if self.lora_path:
+            if self._model.apply_lora_from_file(
+                self.lora_path,
+                self.lora_scale,
+                self.lora_base,
+                self.n_threads,
+            ):
+                raise RuntimeError(
+                    f"Failed to apply LoRA from lora path: {self.lora_path} to base path: {self.lora_base}"
+                )
+
+        if self.verbose:
+            print(llama_cpp.llama_print_system_info().decode("utf-8"), file=sys.stderr)
+
+        self.chat_format = chat_format
+        self.chat_handler = chat_handler
+
+        self.draft_model = draft_model
+
+        self._n_vocab = self.n_vocab()
+        self._n_ctx = self.n_ctx()
+
+        self._token_nl = self.token_nl()
+        self._token_eos = self.token_eos()
+
+        self._candidates = _LlamaTokenDataArray(n_vocab=self._n_vocab)
+
+        self.n_tokens = 0
+        self.input_ids: npt.NDArray[np.intc] = np.ndarray((n_ctx,), dtype=np.intc)
+        self.scores: npt.NDArray[np.single] = np.ndarray(
+            (n_ctx, self._n_vocab), dtype=np.single
+        )
+
+        self._mirostat_mu = ctypes.c_float(
+            2.0 * 5.0
+        )  # TODO: Move this to sampling context
+
+        try:
+            self.metadata = self._model.metadata()
+        except Exception as e:
+            self.metadata = {}
+            if self.verbose:
+                print(f"Failed to load metadata: {e}", file=sys.stderr)
+
+        if self.verbose:
+            print(f"Model metadata: {self.metadata}", file=sys.stderr)
+
+        if (
+            self.chat_format is None
+            and self.chat_handler is None
+            and "tokenizer.chat_template" in self.metadata
+        ):
+            chat_format = llama_chat_format.guess_chat_format_from_gguf_metadata(
+                self.metadata
+            )
+
+            if chat_format is not None:
+                self.chat_format = chat_format
+                if self.verbose:
+                    print(f"Guessed chat format: {chat_format}", file=sys.stderr)
+            else:
+                template = self.metadata["tokenizer.chat_template"]
+                try:
+                    eos_token_id = int(self.metadata["tokenizer.ggml.eos_token_id"])
+                except:
+                    eos_token_id = self.token_eos()
+                try:
+                    bos_token_id = int(self.metadata["tokenizer.ggml.bos_token_id"])
+                except:
+                    bos_token_id = self.token_bos()
+
+                eos_token = self._model.token_get_text(eos_token_id)
+                bos_token = self._model.token_get_text(bos_token_id)
+
+                if self.verbose:
+                    print(f"Using gguf chat template: {template}", file=sys.stderr)
+                    print(f"Using chat eos_token: {eos_token}", file=sys.stderr)
+                    print(f"Using chat bos_token: {bos_token}", file=sys.stderr)
+
+                self.chat_handler = llama_chat_format.Jinja2ChatFormatter(
+                    template=template, eos_token=eos_token, bos_token=bos_token
+                ).to_chat_handler()
+
+        if self.chat_format is None and self.chat_handler is None:
+            self.chat_format = "llama-2"
+            if self.verbose:
+                print(f"Using fallback chat format: {chat_format}", file=sys.stderr)
         self._venv_init()
 
     def str_detokenize(self, tokens) -> str:
@@ -431,7 +821,7 @@ class StreamingLLM(Llama):
                 tokens = [token]
 
     def load_session(self, filepath: str):
-        n_tokens = POINTER(llama_cpp.c_size_t)(llama_cpp.c_size_t(0))
+        n_tokens = POINTER(c_size_t)(c_size_t(0))
         tokens = (llama_cpp.llama_token * self.n_ctx())()
         retn = llama_cpp.llama_load_session_file(self._ctx.ctx,
                                                  filepath.encode('utf-8'),
