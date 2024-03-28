@@ -41,7 +41,7 @@ def init(cfg):
                                    cfg['text_format'](cfg['role_chat_style'].value,
                                                       char=cfg['role_char'].value,
                                                       user=cfg['role_usr'].value))
-        cfg['setting_n_keep'].value += cfg['model'].eval_t(tmp)  # 此内容永久存在
+        cfg['setting_n_keep'].value = cfg['model'].eval_t(tmp)  # 此内容永久存在
 
         # ========== 加载角色卡-第一条消息 ==========
         cfg['chatbot'] = []
