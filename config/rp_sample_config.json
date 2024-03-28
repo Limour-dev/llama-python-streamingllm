@@ -6,7 +6,10 @@
 		"value": 4294967295
 	},
 	"setting_n_gpu_layers": {
-		"value": 20
+		"value": 33
+	},
+	"setting_offload_kqv": {
+		"value": false
 	},
 	"setting_max_tokens": {
 		"value": 1024,
