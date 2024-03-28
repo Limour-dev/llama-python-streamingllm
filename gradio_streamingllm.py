@@ -48,6 +48,7 @@ with gr.Blocks() as setting:
         cfg['setting_cache_path'] = gr.Textbox(label="缓存路径", max_lines=1, scale=2, **cfg['setting_cache_path'])
         cfg['setting_seed'] = gr.Number(label="随机种子", scale=1, **cfg['setting_seed'])
         cfg['setting_n_gpu_layers'] = gr.Number(label="n_gpu_layers", scale=1, **cfg['setting_n_gpu_layers'])
+        cfg['setting_offload_kqv'] = gr.Textbox(label="offload_kqv", max_lines=1, scale=1, **cfg['setting_offload_kqv'])
     with gr.Row(elem_classes='setting'):
         cfg['setting_ctx'] = gr.Number(label="上下文大小（Tokens）", **cfg['setting_ctx'])
         cfg['setting_type_k'] = gr.Textbox(label="type_k", max_lines=1, **cfg['setting_type_k'])
@@ -85,6 +86,7 @@ with gr.Blocks() as setting:
                                 seed=cfg['setting_seed'].value,
                                 n_gpu_layers=cfg['setting_n_gpu_layers'].value,
                                 n_ctx=cfg['setting_ctx'].value,
+                                offload_kqv=(cfg['setting_offload_kqv'].value == 'True'),
                                 type_k=cfg['setting_type_k'].value,
                                 type_v=cfg['setting_type_v'].value,
                                 )
