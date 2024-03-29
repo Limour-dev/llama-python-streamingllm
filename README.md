@@ -27,6 +27,9 @@ https://github.com/Limour-dev/llama-python-streamingllm/assets/93720049/6391cd79
 + After duplicating, set it to private before use.
 + 只能 Duplicate 后，设为私密来使用
 
+## kaggle
++ https://www.kaggle.com/code/reginliu/llama-python-streamingllm
+
 ## Local Installation 本地安装
 ```powershel
 conda create -n llamaCpp libcublas cuda-toolkit git -c nvidia -c conda-forge
