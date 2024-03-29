@@ -38,6 +38,10 @@ pip install --force-reinstall llama_cpp_python-0.2.39+cu122-cp310-cp310-win_amd6
 git clone --depth=1 https://github.com/Limour-dev/llama-python-streamingllm.git
 cd llama-python-streamingllm
 mkdir cache
+mkdir models
+cd models
+D:\aria2\aria2c.exe --all-proxy='http://127.0.0.1:7890' -o 'causallm_14b.IQ3_XS.gguf' --max-download-limit=6M "https://huggingface.co/Limour/CausalLM-14B-GGUF/resolve/main/causallm_14b.IQ3_XS.gguf?download=true"
+cd ..
 python .\gradio_streamingllm.py
 ```
 
