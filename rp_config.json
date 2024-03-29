@@ -1,9 +1,9 @@
 {
 	"setting_path": {
-		"value": "D:\\models\\causallm_7b.IQ4_NL.gguf"
+		"value": "models/causallm_14b.IQ3_XS.gguf"
 	},
 	"setting_ctx": {
-		"value": 4095
+		"value": 2560
 	},
 	"setting_type_k": {
 		"value": "f16"
