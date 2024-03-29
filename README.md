@@ -1,7 +1,7 @@
 ## Overall Effect 整体效果
 + Video Demonstration 视频演示
 
-https://github.com/Limour-dev/llama-python-streamingllm/assets/93720049/6391cd79-8a90-40b2-95fe-cfe5b8ff3ac9
+https://github.com/Limour-dev/llama-python-streamingllm/assets/93720049/52c3e83c-cdcb-4b6b-b5b4-a81acfb088aa
 
 + Chat Page 聊天页面
 
@@ -29,6 +29,9 @@ https://github.com/Limour-dev/llama-python-streamingllm/assets/93720049/6391cd79
 
 ## kaggle
 + https://www.kaggle.com/code/reginliu/llama-python-streamingllm
+
+## colab
++ https://colab.research.google.com/drive/1EzTCj5EllQOR9CtR6hXI_Dwid8gdB47q?usp=sharing
 
 ## Local Installation 本地安装
 ```powershel
